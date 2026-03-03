@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		8430B0CF2F5744B8003A0484 /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 8430B0CE2F5744B8003A0484 /* CryptoSwift */; };
+		84CD00B92F57828A0043D415 /* DGCharts in Frameworks */ = {isa = PBXBuildFile; productRef = 84CD00B82F57828A0043D415 /* DGCharts */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		848BAD1E2F55A2D1001FD8B5 /* Doas.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Doas.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +41,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				84CD00B92F57828A0043D415 /* DGCharts in Frameworks */,
+				8430B0CF2F5744B8003A0484 /* CryptoSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +85,8 @@
 			);
 			name = Doas;
 			packageProductDependencies = (
+				8430B0CE2F5744B8003A0484 /* CryptoSwift */,
+				84CD00B82F57828A0043D415 /* DGCharts */,
 			);
 			productName = Doas;
 			productReference = 848BAD1E2F55A2D1001FD8B5 /* Doas.app */;
@@ -107,6 +116,10 @@
 			);
 			mainGroup = 848BAD152F55A2D1001FD8B5;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8430B0CD2F5744B7003A0484 /* XCRemoteSwiftPackageReference "CryptoSwift" */,
+				84CD00B72F57828A0043D415 /* XCRemoteSwiftPackageReference "Charts" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 848BAD1F2F55A2D1001FD8B5 /* Products */;
 			projectDirPath = "";
@@ -148,11 +161,12 @@
 				DEVELOPMENT_TEAM = X258N9GV6Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Doas/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -164,6 +178,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -180,11 +195,12 @@
 				DEVELOPMENT_TEAM = X258N9GV6Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Doas/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -196,6 +212,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -345,6 +362,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8430B0CD2F5744B7003A0484 /* XCRemoteSwiftPackageReference "CryptoSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/krzyzanowskim/CryptoSwift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.9.0;
+			};
+		};
+		84CD00B72F57828A0043D415 /* XCRemoteSwiftPackageReference "Charts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ChartsOrg/Charts";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8430B0CE2F5744B8003A0484 /* CryptoSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8430B0CD2F5744B7003A0484 /* XCRemoteSwiftPackageReference "CryptoSwift" */;
+			productName = CryptoSwift;
+		};
+		84CD00B82F57828A0043D415 /* DGCharts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 84CD00B72F57828A0043D415 /* XCRemoteSwiftPackageReference "Charts" */;
+			productName = DGCharts;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 848BAD162F55A2D1001FD8B5 /* Project object */;
 }

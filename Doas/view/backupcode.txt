@@ -1,0 +1,844 @@
+
+import UIKit
+
+final class Home: UIViewController {
+
+    // MARK: - Scroll Structure
+
+    let scrollView = UIScrollView()
+    let contentView = UIView()
+
+    // MARK: - HERO SECTION (CollapsingToolbarLayout)
+
+    let heroContainer = UIView()
+    let pageController = UIPageViewController(
+        transitionStyle: .scroll,
+        navigationOrientation: .horizontal
+    )
+
+    let logoImageView = UIImageView()
+    let gradientView = UIView()
+    let titleStack = UIStackView()
+    let tvJudul = UILabel()
+    let tvIsi = UILabel()
+
+    // MARK: - FLOATING MENU CARD (tbMenu)
+
+    let floatingMenuCard = UIView()
+    let tbMenuStack = UIStackView()
+
+    let btAbsen = UIButton()
+    let btStatus = UIButton()
+    let btInfo = UIButton()
+    let btLog = UIButton()
+    let btProfile = UIButton()
+    let btDoas = UIButton()
+
+    // MARK: - PRESENSI CARD
+
+    let presensiCard = UIView()
+    let btHadir = UIButton()
+
+    // MARK: - GRID MENU
+
+    let gridContainer = UIStackView()
+    let btDik = UIButton()
+    let btCuti = UIButton()
+    let btSakit = UIButton()
+    let btBko = UIButton()
+
+    // MARK: - DASHBOARD CARD
+
+    let dashboardCard = UIView()
+    let tvTahunAktif = UILabel()
+    let tvBulanAwal = UILabel()
+    let chartPlaceholder = UIView() // nanti ganti chart library
+    let rvSummarySubdit: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumLineSpacing = 8
+        return UICollectionView(frame: .zero, collectionViewLayout: layout)
+    }()
+
+    let rvUserTerakhir = UICollectionView(
+        frame: .zero,
+        collectionViewLayout: UICollectionViewFlowLayout()
+    )
+
+    // MARK: - STATE
+
+    var isRequestRunning = false
+    let authManager = AuthManager()
+    var beritaItems: [BeritaItem] = []
+    var currentIndex = 0
+    
+    var userTerakhirData: [UserTerakhir] = []
+    var summaryData: [(key: String, value: String)] = []
+    private var summaryHeightConstraint: NSLayoutConstraint?
+    private var userHeightConstraint: NSLayoutConstraint?
+    // =========================================================
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupLayout()
+        pageController.dataSource = self
+        pageController.delegate = self
+        
+        rvSummarySubdit.delegate = self
+        rvSummarySubdit.dataSource = self
+        rvSummarySubdit.isScrollEnabled = false
+        rvSummarySubdit.backgroundColor = .clear
+        rvSummarySubdit.register(SummarySubditCell.self, forCellWithReuseIdentifier: "SummarySubditCell")
+        
+        rvUserTerakhir.dataSource = self
+        rvUserTerakhir.delegate = self
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        refreshData()
+    }
+
+    // =========================================================
+    // MARK: - LAYOUT SETUP (1:1 STRUCTURE)
+    // =========================================================
+
+    private func setupLayout() {
+
+        view.backgroundColor = .systemBackground
+
+        // ScrollView
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scrollView)
+
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+
+        // ContentView
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentView)
+
+        NSLayoutConstraint.activate([
+            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
+        ])
+
+        setupHeroSection()
+        setupFloatingMenu()
+        setupPresensiCard()
+        setupGridMenu()
+        setupDashboardCard()
+    }
+
+    // =========================================================
+    // HERO
+    // =========================================================
+
+    private func setupHeroSection() {
+
+        heroContainer.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(heroContainer)
+
+        NSLayoutConstraint.activate([
+            heroContainer.topAnchor.constraint(equalTo: contentView.topAnchor),
+            heroContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            heroContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            heroContainer.heightAnchor.constraint(equalToConstant: 280)
+        ])
+
+        addChild(pageController)
+        pageController.view.translatesAutoresizingMaskIntoConstraints = false
+        heroContainer.addSubview(pageController.view)
+        pageController.didMove(toParent: self)
+
+        NSLayoutConstraint.activate([
+            pageController.view.topAnchor.constraint(equalTo: heroContainer.topAnchor),
+            pageController.view.bottomAnchor.constraint(equalTo: heroContainer.bottomAnchor),
+            pageController.view.leadingAnchor.constraint(equalTo: heroContainer.leadingAnchor),
+            pageController.view.trailingAnchor.constraint(equalTo: heroContainer.trailingAnchor)
+        ])
+
+        // Logo DOAS (top-left)
+        logoImageView.translatesAutoresizingMaskIntoConstraints = false
+        logoImageView.contentMode = .scaleAspectFit
+        logoImageView.image = UIImage(named: "doas2")
+        heroContainer.addSubview(logoImageView)
+
+        NSLayoutConstraint.activate([
+            logoImageView.topAnchor.constraint(equalTo: heroContainer.topAnchor, constant: 16),
+            logoImageView.leadingAnchor.constraint(equalTo: heroContainer.leadingAnchor, constant: 16),
+            logoImageView.widthAnchor.constraint(equalToConstant: 100),
+            logoImageView.heightAnchor.constraint(equalToConstant: 40)
+        ])
+
+        gradientView.backgroundColor = UIColor.black.withAlphaComponent(0.2)
+        gradientView.translatesAutoresizingMaskIntoConstraints = false
+        gradientView.isUserInteractionEnabled = false   // 🔥 TAMBAHKAN INI
+        heroContainer.addSubview(gradientView)
+
+        NSLayoutConstraint.activate([
+            gradientView.topAnchor.constraint(equalTo: heroContainer.topAnchor),
+            gradientView.bottomAnchor.constraint(equalTo: heroContainer.bottomAnchor),
+            gradientView.leadingAnchor.constraint(equalTo: heroContainer.leadingAnchor),
+            gradientView.trailingAnchor.constraint(equalTo: heroContainer.trailingAnchor)
+        ])
+
+        titleStack.axis = .vertical
+        titleStack.spacing = 4
+        titleStack.translatesAutoresizingMaskIntoConstraints = false
+
+        tvJudul.textColor = .white
+        tvJudul.font = .boldSystemFont(ofSize: 22)
+
+        tvIsi.textColor = .white
+        tvIsi.font = .systemFont(ofSize: 14)
+
+        titleStack.addArrangedSubview(tvJudul)
+        titleStack.addArrangedSubview(tvIsi)
+
+        heroContainer.addSubview(titleStack)
+
+        NSLayoutConstraint.activate([
+            titleStack.leadingAnchor.constraint(equalTo: heroContainer.leadingAnchor, constant: 24),
+            titleStack.bottomAnchor.constraint(equalTo: heroContainer.bottomAnchor, constant: -24)
+        ])
+    }
+
+    // =========================================================
+    // FLOATING MENU
+    // =========================================================
+
+    private func setupFloatingMenu() {
+
+        floatingMenuCard.translatesAutoresizingMaskIntoConstraints = false
+        floatingMenuCard.backgroundColor = .white
+        floatingMenuCard.layer.cornerRadius = 16
+        floatingMenuCard.layer.shadowColor = UIColor.black.cgColor
+        floatingMenuCard.layer.shadowOpacity = 0.15
+        floatingMenuCard.layer.shadowRadius = 6
+        floatingMenuCard.layer.shadowOffset = CGSize(width: 0, height: 4)
+
+        contentView.addSubview(floatingMenuCard)
+
+        NSLayoutConstraint.activate([
+            floatingMenuCard.topAnchor.constraint(equalTo: heroContainer.bottomAnchor, constant: -26),
+            floatingMenuCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            floatingMenuCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            floatingMenuCard.heightAnchor.constraint(equalToConstant: 64)
+        ])
+
+        // Horizontal stack (weightSum=6 equivalent)
+        tbMenuStack.axis = .horizontal
+        tbMenuStack.distribution = .fillEqually
+        tbMenuStack.alignment = .fill
+        tbMenuStack.translatesAutoresizingMaskIntoConstraints = false
+
+        floatingMenuCard.addSubview(tbMenuStack)
+
+        NSLayoutConstraint.activate([
+            tbMenuStack.topAnchor.constraint(equalTo: floatingMenuCard.topAnchor),
+            tbMenuStack.bottomAnchor.constraint(equalTo: floatingMenuCard.bottomAnchor),
+            tbMenuStack.leadingAnchor.constraint(equalTo: floatingMenuCard.leadingAnchor),
+            tbMenuStack.trailingAnchor.constraint(equalTo: floatingMenuCard.trailingAnchor)
+        ])
+
+        // Configure Buttons
+        configureMenuButton(btAbsen, title: "Absen", icon: "ic_fingerprint", active: true)
+        configureMenuButton(btStatus, title: "Status", icon: "ic_status")
+        configureMenuButton(btInfo, title: "Berita", icon: "ic_news")
+        configureMenuButton(btLog, title: "Log", icon: "ic_log")
+        configureMenuButton(btProfile, title: "Profile", icon: "ic_person")
+        configureMenuButton(btDoas, title: "DOAS", icon: "ic_about")
+
+        tbMenuStack.addArrangedSubview(btAbsen)
+        tbMenuStack.addArrangedSubview(btStatus)
+        tbMenuStack.addArrangedSubview(btInfo)
+        tbMenuStack.addArrangedSubview(btLog)
+        tbMenuStack.addArrangedSubview(btProfile)
+        tbMenuStack.addArrangedSubview(btDoas)
+    }
+
+    // =========================================================
+    // PRESENSI
+    // =========================================================
+
+    private func setupPresensiCard() {
+
+        presensiCard.translatesAutoresizingMaskIntoConstraints = false
+        presensiCard.backgroundColor = .white
+        presensiCard.layer.cornerRadius = 20
+        presensiCard.layer.shadowColor = UIColor.black.cgColor
+        presensiCard.layer.shadowOpacity = 0.1
+        presensiCard.layer.shadowRadius = 6
+        presensiCard.layer.shadowOffset = CGSize(width: 0, height: 4)
+
+        contentView.addSubview(presensiCard)
+
+        NSLayoutConstraint.activate([
+            presensiCard.topAnchor.constraint(equalTo: floatingMenuCard.bottomAnchor, constant: 16),
+            presensiCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            presensiCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16)
+        ])
+
+        let innerStack = UIStackView()
+        innerStack.axis = .vertical
+        innerStack.spacing = 14
+        innerStack.translatesAutoresizingMaskIntoConstraints = false
+
+        presensiCard.addSubview(innerStack)
+
+        NSLayoutConstraint.activate([
+            innerStack.topAnchor.constraint(equalTo: presensiCard.topAnchor, constant: 22),
+            innerStack.bottomAnchor.constraint(equalTo: presensiCard.bottomAnchor, constant: -22),
+            innerStack.leadingAnchor.constraint(equalTo: presensiCard.leadingAnchor, constant: 22),
+            innerStack.trailingAnchor.constraint(equalTo: presensiCard.trailingAnchor, constant: -22)
+        ])
+
+        let titleLabel = UILabel()
+        titleLabel.text = "Presensi Hari Ini"
+        titleLabel.font = UIFont.systemFont(ofSize: 13)
+        titleLabel.textColor = UIColor.systemGray
+
+        btHadir.setTitle("ABSEN DINAS LUAR", for: .normal)
+        btHadir.setTitleColor(.white, for: .normal)
+        btHadir.titleLabel?.font = UIFont.boldSystemFont(ofSize: 16)
+        btHadir.backgroundColor = UIColor.systemBlue
+        btHadir.layer.cornerRadius = 12
+        btHadir.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            btHadir.heightAnchor.constraint(equalToConstant: 60)
+        ])
+
+        innerStack.addArrangedSubview(titleLabel)
+        innerStack.addArrangedSubview(btHadir)
+    }
+
+    // =========================================================
+    // GRID MENU
+    // =========================================================
+
+    private func setupGridMenu() {
+
+        // Container Vertical
+        gridContainer.axis = .vertical
+        gridContainer.spacing = 12
+        gridContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        contentView.addSubview(gridContainer)
+
+        NSLayoutConstraint.activate([
+            gridContainer.topAnchor.constraint(equalTo: presensiCard.bottomAnchor, constant: 16),
+            gridContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            gridContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16)
+        ])
+
+        // Row 1
+        let row1 = UIStackView()
+        row1.axis = .horizontal
+        row1.spacing = 12
+        row1.distribution = .fillEqually
+
+        // Row 2
+        let row2 = UIStackView()
+        row2.axis = .horizontal
+        row2.spacing = 12
+        row2.distribution = .fillEqually
+
+        configureGridButton(btDik, title: "DIK")
+        configureGridButton(btCuti, title: "Cuti")
+        configureGridButton(btSakit, title: "Sakit")
+        configureGridButton(btBko, title: "BKO")
+
+        row1.addArrangedSubview(btDik)
+        row1.addArrangedSubview(btCuti)
+
+        row2.addArrangedSubview(btSakit)
+        row2.addArrangedSubview(btBko)
+
+        gridContainer.addArrangedSubview(row1)
+        gridContainer.addArrangedSubview(row2)
+    }
+
+    // =========================================================
+    // DASHBOARD
+    // =========================================================
+
+    private func setupDashboardCard() {
+
+        dashboardCard.translatesAutoresizingMaskIntoConstraints = false
+        dashboardCard.backgroundColor = .white
+        dashboardCard.layer.cornerRadius = 16
+        dashboardCard.layer.shadowColor = UIColor.black.cgColor
+        dashboardCard.layer.shadowOpacity = 0.1
+        dashboardCard.layer.shadowRadius = 6
+        dashboardCard.layer.shadowOffset = CGSize(width: 0, height: 4)
+
+        contentView.addSubview(dashboardCard)
+
+        NSLayoutConstraint.activate([
+            dashboardCard.topAnchor.constraint(equalTo: gridContainer.bottomAnchor, constant: 16),
+            dashboardCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            dashboardCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            dashboardCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24)
+        ])
+
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        dashboardCard.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: dashboardCard.topAnchor, constant: 16),
+            stack.bottomAnchor.constraint(equalTo: dashboardCard.bottomAnchor, constant: -16),
+            stack.leadingAnchor.constraint(equalTo: dashboardCard.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: dashboardCard.trailingAnchor, constant: -16)
+        ])
+
+        // ======================
+        // TITLE
+        // ======================
+
+        let dashboardTitle = UILabel()
+        dashboardTitle.text = "Dashboard Anggaran"
+        dashboardTitle.font = UIFont.boldSystemFont(ofSize: 16)
+
+        tvTahunAktif.text = "Tahun Aktif: -"
+        tvTahunAktif.font = UIFont.systemFont(ofSize: 14)
+
+        tvBulanAwal.text = "Bulan Awal: -"
+        tvBulanAwal.font = UIFont.systemFont(ofSize: 14)
+
+        let summaryTitle = UILabel()
+        summaryTitle.text = "Summary Subdit"
+        summaryTitle.font = UIFont.boldSystemFont(ofSize: 14)
+
+        // ======================
+        // COLLECTION SUMMARY
+        // ======================
+
+        if let layout = rvSummarySubdit.collectionViewLayout as? UICollectionViewFlowLayout {
+            layout.scrollDirection = .vertical
+            layout.minimumLineSpacing = 8
+        }
+
+        rvSummarySubdit.backgroundColor = .clear
+        rvSummarySubdit.isScrollEnabled = false
+        rvSummarySubdit.translatesAutoresizingMaskIntoConstraints = false
+        rvSummarySubdit.register(SummarySubditCell.self, forCellWithReuseIdentifier: "SummarySubditCell")
+
+        summaryHeightConstraint = rvSummarySubdit.heightAnchor.constraint(equalToConstant: 1)
+        summaryHeightConstraint?.isActive = true
+
+        // ======================
+        // CHART
+        // ======================
+
+        let chartTitle = UILabel()
+        chartTitle.text = "Grafik Subdit"
+        chartTitle.font = UIFont.boldSystemFont(ofSize: 14)
+
+        chartPlaceholder.backgroundColor = UIColor.systemGray6
+        chartPlaceholder.layer.cornerRadius = 12
+        chartPlaceholder.translatesAutoresizingMaskIntoConstraints = false
+        chartPlaceholder.heightAnchor.constraint(equalToConstant: 220).isActive = true
+
+        // ======================
+        // USER TERAKHIR
+        // ======================
+
+        let userTitle = UILabel()
+        userTitle.text = "User Terakhir"
+        userTitle.font = UIFont.boldSystemFont(ofSize: 14)
+
+        if let layout = rvUserTerakhir.collectionViewLayout as? UICollectionViewFlowLayout {
+            layout.scrollDirection = .vertical
+            layout.minimumLineSpacing = 8
+        }
+
+        rvUserTerakhir.backgroundColor = .clear
+        rvUserTerakhir.isScrollEnabled = false
+        rvUserTerakhir.translatesAutoresizingMaskIntoConstraints = false
+        rvUserTerakhir.register(UserTerakhirCell.self, forCellWithReuseIdentifier: "UserTerakhirCell")
+
+        userHeightConstraint = rvUserTerakhir.heightAnchor.constraint(equalToConstant: 1)
+        userHeightConstraint?.isActive = true
+
+        // ======================
+        // ADD TO STACK
+        // ======================
+
+        stack.addArrangedSubview(dashboardTitle)
+        stack.addArrangedSubview(tvTahunAktif)
+        stack.addArrangedSubview(tvBulanAwal)
+        stack.addArrangedSubview(summaryTitle)
+        stack.addArrangedSubview(rvSummarySubdit)
+        stack.addArrangedSubview(chartTitle)
+        stack.addArrangedSubview(chartPlaceholder)
+        stack.addArrangedSubview(userTitle)
+        stack.addArrangedSubview(rvUserTerakhir)
+    }
+
+    // =========================================================
+
+    func refreshData() {
+        if isRequestRunning { return }
+        isRequestRunning = true
+        // nanti panggil dos()
+        dos()
+    }
+    
+    private func configureMenuButton(
+        _ button: UIButton,
+        title: String,
+        icon: String,
+        active: Bool = false
+    ) {
+
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(active ? UIColor.systemBlue : UIColor.systemGray, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 10, weight: active ? .bold : .regular)
+
+        if let image = UIImage(named: icon) {
+            button.setImage(image.withRenderingMode(.alwaysTemplate), for: .normal)
+            button.tintColor = active ? UIColor.systemBlue : UIColor.systemGray
+        }
+
+        button.backgroundColor = active
+            ? UIColor.systemBlue.withAlphaComponent(0.1)
+            : UIColor.clear
+
+        button.titleEdgeInsets = UIEdgeInsets(top: 30, left: -24, bottom: 0, right: 0)
+        button.imageEdgeInsets = UIEdgeInsets(top: -10, left: 0, bottom: 10, right: -40)
+
+        button.contentHorizontalAlignment = .center
+    }
+    
+    private func configureGridButton(_ button: UIButton, title: String) {
+
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(.systemBlue, for: .normal)
+        button.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+
+        button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.08)
+        button.layer.cornerRadius = 14
+        button.layer.borderWidth = 1
+        button.layer.borderColor = UIColor.systemBlue.cgColor
+
+        button.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            button.heightAnchor.constraint(equalToConstant: 56)
+        ])
+    }
+    func setBerita(_ items: [BeritaItem]) {
+
+        beritaItems = items
+
+        guard let first = items.first else { return }
+
+        let firstVC = BannerPageVC(item: first)
+
+        pageController.setViewControllers(
+            [firstVC],
+            direction: .forward,
+            animated: false
+        )
+
+        tvJudul.text = first.judul
+        tvIsi.text = first.isi.hendry_htmlToPlain()
+
+        startAutoSlide()
+    }
+    private var slideTimer: Timer?
+
+    private func startAutoSlide() {
+
+        slideTimer?.invalidate()
+
+        slideTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            guard self.beritaItems.count > 1,
+                  let currentVC = self.pageController.viewControllers?.first as? BannerPageVC,
+                  let index = self.beritaItems.firstIndex(where: { $0.id == currentVC.item.id })
+            else { return }
+
+            let nextIndex = (index + 1) % self.beritaItems.count
+            let nextVC = BannerPageVC(item: self.beritaItems[nextIndex])
+
+            self.pageController.setViewControllers(
+                [nextVC],
+                direction: .forward,
+                animated: true
+            )
+
+            self.tvJudul.text = nextVC.item.judul
+            self.tvIsi.text = nextVC.item.isi.hendry_htmlToPlain()
+        }
+    }
+    
+    func renderDashboard(_ data: DashboardData?) {
+
+        guard let data = data else { return }
+
+        tvTahunAktif.text = "Tahun Aktif: \(data.tahunAktif)"
+        tvBulanAwal.text = "Bulan Awal: \(data.bulanAwal)"
+
+        summaryData = data.summarySubdit
+            .sorted { $0.key < $1.key }
+            .map { ($0.key, $0.value.persen) }
+
+        userTerakhirData = data.userTerakhir
+
+        rvSummarySubdit.reloadData()
+        rvUserTerakhir.reloadData()
+
+        // 🔥 WAJIB INI
+        DispatchQueue.main.async {
+            self.rvSummarySubdit.layoutIfNeeded()
+            self.rvUserTerakhir.layoutIfNeeded()
+
+            self.summaryHeightConstraint?.constant =
+                self.rvSummarySubdit.collectionViewLayout.collectionViewContentSize.height
+
+            self.userHeightConstraint?.constant =
+                self.rvUserTerakhir.collectionViewLayout.collectionViewContentSize.height
+        }
+    }
+
+    private func setupChart(_ data: DashboardData) {
+        // TODO: Implement chart rendering. For now, this is a placeholder to avoid compile errors.
+    }
+
+    func showAlert(_ message: String) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+}
+
+
+extension Home: UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+
+    func pageViewController(
+        _ pageViewController: UIPageViewController,
+        viewControllerBefore viewController: UIViewController
+    ) -> UIViewController? {
+
+        guard let vc = viewController as? BannerPageVC,
+              let index = beritaItems.firstIndex(where: { $0.id == vc.item.id }),
+              index > 0 else { return nil }
+
+        return BannerPageVC(item: beritaItems[index - 1])
+    }
+
+    func pageViewController(
+        _ pageViewController: UIPageViewController,
+        viewControllerAfter viewController: UIViewController
+    ) -> UIViewController? {
+
+        guard let vc = viewController as? BannerPageVC,
+              let index = beritaItems.firstIndex(where: { $0.id == vc.item.id }),
+              index < beritaItems.count - 1 else { return nil }
+
+        return BannerPageVC(item: beritaItems[index + 1])
+    }
+
+    func pageViewController(
+        _ pageViewController: UIPageViewController,
+        didFinishAnimating finished: Bool,
+        previousViewControllers: [UIViewController],
+        transitionCompleted completed: Bool
+    ) {
+        if completed,
+           let current = pageController.viewControllers?.first as? BannerPageVC {
+
+            tvJudul.text = current.item.judul
+            tvIsi.text = current.item.isi.hendry_htmlToPlain()
+        }
+    }
+}
+
+extension Home: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if collectionView === rvSummarySubdit {
+            return summaryData.count
+        } else if collectionView === rvUserTerakhir {
+            return userTerakhirData.count
+        }
+        return 0
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        if collectionView === rvSummarySubdit {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "SummarySubditCell", for: indexPath) as! SummarySubditCell
+            let (key, value) = summaryData[indexPath.item]
+            cell.configure(title: key, value: value)
+            return cell
+        } else {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "UserTerakhirCell", for: indexPath) as! UserTerakhirCell
+            let item = userTerakhirData[indexPath.item]
+            cell.configure(name: item.name)
+            return cell
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        return CGSize(width: collectionView.bounds.width, height: 44)
+    }
+    
+}
+
+struct DashboardData {
+
+    let tahunAktif: String
+    let bulanAwal: String
+
+    let summarySubdit: [String: SummarySubdit]
+    let userTerakhir: [UserTerakhir]
+
+    static func from(json: [String: Any]) -> DashboardData {
+
+        // BASIC
+        let tahunAktif = "\(json["tahunAktif"] ?? "")"
+        let bulanAwal = "\(json["bulanAwal"] ?? "")"
+
+        // SUMMARY SUBDIT
+        // SUMMARY SUBDIT
+        var summary: [String: SummarySubdit] = [:]
+
+        if let rawSummary = json["summarySubdit"] as? [String: Any] {
+
+            for (key, value) in rawSummary {
+
+                if let obj = value as? [String: Any] {
+
+                    let diajukan = String(describing: obj["diajukan"] ?? "0")
+                    let terserap = String(describing: obj["terserap"] ?? "0")
+                    let persen = String(describing: obj["persen"] ?? "0")
+
+                    summary[key] = SummarySubdit(
+                        diajukan: diajukan,
+                        terserap: terserap,
+                        persen: persen
+                    )
+                }
+            }
+        }
+
+        // USER TERAKHIR
+        var users: [UserTerakhir] = []
+
+        if let rawUsers = json["userTerakhir"] as? [[String: Any]] {
+
+            for obj in rawUsers {
+
+                users.append(
+                    UserTerakhir(
+                        name: obj["name"] as? String ?? "",
+                        pangkat: obj["pangkat"] as? String ?? "",
+                        jabatan: obj["jabatan"] as? String ?? "",
+                        subdit: obj["subdit"] as? String ?? "",
+                        createdDtm: obj["createdDtm"] as? String ?? ""
+                    )
+                )
+            }
+        }
+
+        return DashboardData(
+            tahunAktif: tahunAktif,
+            bulanAwal: bulanAwal,
+            summarySubdit: summary,
+            userTerakhir: users
+        )
+    }
+}
+final class SummarySubditCell: UICollectionViewCell {
+    private let titleLabel = UILabel()
+    private let valueLabel = UILabel()
+    private let stack = UIStackView()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
+    }
+
+    required init?(coder: NSCoder) { super.init(coder: coder); setup() }
+
+    private func setup() {
+        stack.axis = .horizontal
+        stack.alignment = .fill
+        stack.distribution = .fill
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        titleLabel.font = .systemFont(ofSize: 14)
+        valueLabel.font = .boldSystemFont(ofSize: 14)
+        valueLabel.textAlignment = .right
+
+        contentView.addSubview(stack)
+        stack.addArrangedSubview(titleLabel)
+        stack.addArrangedSubview(valueLabel)
+
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: contentView.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor)
+        ])
+    }
+
+    func configure(title: String, value: String) {
+        titleLabel.text = title
+        valueLabel.text = value
+    }
+}
+
+final class UserTerakhirCell: UICollectionViewCell {
+    private let nameLabel = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
+    }
+
+    required init?(coder: NSCoder) { super.init(coder: coder); setup() }
+
+    private func setup() {
+        nameLabel.font = .systemFont(ofSize: 14)
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(nameLabel)
+        NSLayoutConstraint.activate([
+            nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor),
+            nameLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor)
+        ])
+    }
+
+    func configure(name: String) {
+        nameLabel.text = name
+    }
+}
+
+struct SummarySubdit {
+    let diajukan: String
+    let terserap: String
+    let persen: String
+}
+
+struct UserTerakhir {
+    let name: String
+    let pangkat: String
+    let jabatan: String
+    let subdit: String
+    let createdDtm: String
+}
