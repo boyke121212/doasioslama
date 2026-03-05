@@ -9,30 +9,21 @@ extension Home {
     func dos() {
 
         authManager.checkAuth(
-            endpoint: "api/auth-check",
+
             onSuccess: { json in
-              
+                self.hideLoading()
+
                 DispatchQueue.main.async {
+
                     self.rawDashboardJSON = json
                     self.isRequestRunning = false
 
                     guard let aesKey = json["aes_key"] as? String else { return }
 
-                    // ===============================
-                    // DASHBOARD
-                    // ===============================
-
                     if let dashboard = json["dashboard"] as? [String: Any] {
                         let data = DashboardData.from(json: dashboard)
-                   
-                    
                         self.renderDashboard(data)
                     }
-                 
-
-                    // ===============================
-                    // BERITA
-                    // ===============================
 
                     if let beritaArray = json["berita"] as? [[String: Any]] {
 
@@ -60,11 +51,21 @@ extension Home {
             onLogout: { message in
                 DispatchQueue.main.async {
                     self.isRequestRunning = false
+                    self.hideLoading()
                     self.showAlert(message)
                 }
             },
 
-            onLoading: { _ in }
+            onLoading: { loading in
+                DispatchQueue.main.async {
+
+                    if loading {
+                        self.showLoading()
+                    } else {
+                        self.hideLoading()
+                    }
+                }
+            }
         )
     }
 }
@@ -249,34 +250,51 @@ extension Home {
 
         alert.addAction(UIAlertAction(title: "Setuju", style: .default) { _ in
 
-            self.authManager.checkAuth(
-                endpoint: "api/cekabsen",
+            AuthManager(endpoint: "api/cekabsen").checkAuth(
+
+                params: nil,
+
                 onSuccess: { json in
 
                     DispatchQueue.main.async {
 
+                        self.hideLoading()
+
                         let absen = json["absen"] as? String ?? ""
 
                         if absen.lowercased() == "belum" {
+
                             let vc = AbsenHadir()
                             vc.modalPresentationStyle = .fullScreen
                             self.present(vc, animated: true)
+
                         } else {
+
                             self.showAlert(absen)
                         }
                     }
                 },
+
                 onLogout: { message in
+
                     DispatchQueue.main.async {
+                        self.hideLoading()
                         self.showAlert(message)
                     }
                 },
-                onLoading: { _ in }
+
+                onLoading: { loading in
+
+                    DispatchQueue.main.async {
+                        loading ? self.showLoading() : self.hideLoading()
+                    }
+                }
             )
         })
 
         alert.addAction(UIAlertAction(title: "Tidak", style: .cancel))
 
+        // ⬅️ JANGAN pakai DispatchQueue di sini
         present(alert, animated: true)
     }
 }
@@ -297,13 +315,15 @@ extension Home {
         case "sakit": params["jenis"] = "SAKIT"
         case "bko": params["jenis"] = "BKO"
         case "cuti": params["jenis"] = "CUTI"
-        default: break
+        default:  params["jenis"] = ""
         }
 
-        authManager.checkAuth(
-            endpoint: "api/cekabsen",
+        AuthManager(endpoint: "api/cekabsen").checkAuth(
             params: params,
+
             onSuccess: { json in
+
+                self.hideLoading()
 
                 DispatchQueue.main.async {
 
@@ -317,6 +337,9 @@ extension Home {
 
                     case "dik":
                         self.startAbsen(absen: absen, target: AbsenDik.self, ketam: ketam)
+
+                    case "hadir":
+                        self.startAbsen(absen: absen, target: AbsenHadir.self, ketam: ketam)
 
                     case "sakit":
                         self.startAbsen(absen: absen, target: AbsenSakit.self, ketam: ketam)
@@ -332,12 +355,18 @@ extension Home {
                     }
                 }
             },
+
             onLogout: { message in
                 DispatchQueue.main.async {
                     self.showAlert(message)
                 }
             },
-            onLoading: { _ in }
+
+            onLoading: { loading in
+                DispatchQueue.main.async {
+                    loading ? self.showLoading() : self.hideLoading()
+                }
+            }
         )
     }
 }
@@ -434,3 +463,6 @@ private func hendry_makeHTMLAttributed(_ html: String, baseFontSize: CGFloat = 1
     ]
     return try? NSAttributedString(data: data, options: options, documentAttributes: nil)
 }
+
+
+

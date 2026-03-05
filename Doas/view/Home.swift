@@ -1,9 +1,94 @@
-
 import UIKit
 
 import DGCharts
 
-final class Home: UIViewController {
+final class MenuItemView: UIControl {
+
+    private let stack = UIStackView()
+    private let imageView = UIImageView()
+    private let titleLabel = UILabel()
+
+    private var activeColor: UIColor = .systemBlue
+    private var inactiveColor: UIColor = .systemGray
+
+    init(title: String, iconName: String, active: Bool = false) {
+        super.init(frame: .zero)
+        setup()
+        configure(title: title, iconName: iconName, active: active)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    private func setup() {
+
+        translatesAutoresizingMaskIntoConstraints = false
+
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 4
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.isUserInteractionEnabled = false   // 🔥 penting
+
+        imageView.contentMode = .scaleAspectFit
+        imageView.tintColor = inactiveColor
+        imageView.setContentHuggingPriority(.required, for: .vertical)
+        imageView.setContentCompressionResistancePriority(.required, for: .vertical)
+        imageView.isUserInteractionEnabled = false
+
+        titleLabel.font = UIFont.systemFont(ofSize: 10)
+        titleLabel.textColor = inactiveColor
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 1
+        titleLabel.isUserInteractionEnabled = false
+
+        addSubview(stack)
+
+        stack.addArrangedSubview(imageView)
+        stack.addArrangedSubview(titleLabel)
+
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 4),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4)
+        ])
+
+        heightAnchor.constraint(equalToConstant: 64).isActive = true
+    }
+
+    // 🔥 HARUS di luar setup()
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        return bounds.contains(point)
+    }
+
+    func configure(title: String, iconName: String, active: Bool) {
+        titleLabel.text = title
+
+        if let img = UIImage(named: iconName)?.withRenderingMode(.alwaysTemplate) {
+            imageView.image = img
+        } else {
+            imageView.image = nil
+        }
+
+        setActive(active)
+    }
+
+    func setActive(_ active: Bool) {
+        let color = active ? activeColor : inactiveColor
+
+        titleLabel.font = UIFont.systemFont(ofSize: 10, weight: active ? .bold : .regular)
+        titleLabel.textColor = color
+        imageView.tintColor = color
+
+        backgroundColor = active ? UIColor.systemBlue.withAlphaComponent(0.1) : .clear
+        layer.cornerRadius = 10
+    }
+}
+
+final class Home: Boyke, UIScrollViewDelegate {
     
     // MARK: - Scroll Structure
     let lineChartView = LineChartView()
@@ -25,12 +110,12 @@ final class Home: UIViewController {
     let floatingMenuCard = UIView()
     let tbMenuStack = UIStackView()
     
-    let btAbsen = UIButton()
-    let btStatus = UIButton()
-    let btInfo = UIButton()
-    let btLog = UIButton()
-    let btProfile = UIButton()
-    let btDoas = UIButton()
+    let btAbsen = MenuItemView(title: "Absen", iconName: "ic_fingerprint", active: true)
+    let btStatus = MenuItemView(title: "Status", iconName: "ic_status")
+    let btInfo = MenuItemView(title: "Berita", iconName: "ic_news")
+    let btLog = MenuItemView(title: "Log", iconName: "ic_log")
+    let btProfile = MenuItemView(title: "Profile", iconName: "ic_person")
+    let btDoas = MenuItemView(title: "DOAS", iconName: "ic_about")
     
     // MARK: - PRESENSI CARD
     
@@ -59,10 +144,15 @@ final class Home: UIViewController {
     // MARK: - STATE
     
     var isRequestRunning = false
-    let authManager = AuthManager()
+    let authManager = AuthManager(endpoint: "api/auth-check")
     var beritaItems: [BeritaItem] = []
     var currentIndex = 0
     var rawDashboardJSON: [String: Any]?
+
+    // Collapsing header
+    private let headerMaxHeight: CGFloat = 280
+    private let headerMinHeight: CGFloat = 140
+    private var headerHeightConstraint: NSLayoutConstraint!
     
     let pageController = UIPageViewController(
         transitionStyle: .scroll,
@@ -77,7 +167,7 @@ final class Home: UIViewController {
         pageController.dataSource = self
         pageController.delegate = self
         setupChartStyle()   // ⬅️ TAMBAHKAN INI
-
+        setupAbsenMenu()
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -103,6 +193,8 @@ final class Home: UIViewController {
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
+        
+        scrollView.delegate = self
         
         contentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentView)
@@ -135,7 +227,12 @@ final class Home: UIViewController {
             heroContainer.topAnchor.constraint(equalTo: contentView.topAnchor),
             heroContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             heroContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            heroContainer.heightAnchor.constraint(equalToConstant: 280)
+            // Store height constraint for collapsing header
+            {
+                let c = heroContainer.heightAnchor.constraint(equalToConstant: headerMaxHeight)
+                self.headerHeightConstraint = c
+                return c
+            }()
         ])
         
         addChild(pageController)
@@ -195,6 +292,31 @@ final class Home: UIViewController {
         ])
     }
     
+    private func setupAbsenMenu() {
+
+        let mapAbsen: [UIControl: String] = [
+            btStatus: "status",
+            btDik: "dik",
+            btSakit: "sakit",
+            btBko: "bko",
+            btCuti: "cuti"
+        ]
+
+        for (button, value) in mapAbsen {
+
+            button.accessibilityIdentifier = value
+
+            button.addTarget(
+                self,
+                action: #selector(onTapMenuAbsen(_:)),
+                for: .touchUpInside
+            )
+        }
+        btHadir.addTarget(self, action: #selector(onTapHadir), for: .touchUpInside)
+    }
+    @objc private func onTapHadir() {
+        go()
+    }
     // =========================================================
     // FLOATING MENU
     // =========================================================
@@ -231,19 +353,19 @@ final class Home: UIViewController {
             tbMenuStack.trailingAnchor.constraint(equalTo: floatingMenuCard.trailingAnchor)
         ])
         
-        configureMenuButton(btAbsen, title: "Absen", icon: "ic_fingerprint", active: true)
-        configureMenuButton(btStatus, title: "Status", icon: "ic_status")
-        configureMenuButton(btInfo, title: "Berita", icon: "ic_news")
-        configureMenuButton(btLog, title: "Log", icon: "ic_log")
-        configureMenuButton(btProfile, title: "Profile", icon: "ic_person")
-        configureMenuButton(btDoas, title: "DOAS", icon: "ic_about")
-        
         tbMenuStack.addArrangedSubview(btAbsen)
         tbMenuStack.addArrangedSubview(btStatus)
         tbMenuStack.addArrangedSubview(btInfo)
         tbMenuStack.addArrangedSubview(btLog)
         tbMenuStack.addArrangedSubview(btProfile)
         tbMenuStack.addArrangedSubview(btDoas)
+        
+//        btAbsen.addTarget(self, action: #selector(onTapAbsen), for: .touchUpInside)
+//        btStatus.addTarget(self, action: #selector(onTapStatus), for: .touchUpInside)
+//        btInfo.addTarget(self, action: #selector(onTapInfo), for: .touchUpInside)
+//        btLog.addTarget(self, action: #selector(onTapLog), for: .touchUpInside)
+//        btProfile.addTarget(self, action: #selector(onTapProfile), for: .touchUpInside)
+//        btDoas.addTarget(self, action: #selector(onTapDoas), for: .touchUpInside)
     }
     
     // =========================================================
@@ -419,6 +541,24 @@ final class Home: UIViewController {
         stack.addArrangedSubview(userContainer)
     }
     
+    // MARK: - Collapsing Header
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let y = scrollView.contentOffset.y
+        // Calculate new height clamped between min and max
+        let newHeight = max(headerMinHeight, headerMaxHeight - y)
+        headerHeightConstraint.constant = newHeight
+
+        // Progress 0..1 (0 = expanded, 1 = collapsed)
+        let progress = min(max((headerMaxHeight - newHeight) / (headerMaxHeight - headerMinHeight), 0), 1)
+
+        // Subtle fade for title and subtitle
+        tvJudul.alpha = 1 - 0.25 * progress
+        tvIsi.alpha = 1 - 0.6 * progress
+
+        // Layout immediately for smoothness
+        view.layoutIfNeeded()
+    }
+    
     // =========================================================
     // DATA
     // =========================================================
@@ -476,48 +616,36 @@ final class Home: UIViewController {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
-    private func configureMenuButton(
-        _ button: UIButton,
-        title: String,
-        icon: String,
-        active: Bool = false
-    ) {
-
-        button.setTitle(title, for: .normal)
-        button.setTitleColor(active ? UIColor.systemBlue : UIColor.systemGray, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 10, weight: active ? .bold : .regular)
-
-        if let image = UIImage(named: icon) {
-            button.setImage(image.withRenderingMode(.alwaysTemplate), for: .normal)
-            button.tintColor = active ? UIColor.systemBlue : UIColor.systemGray
-        }
-
-        button.backgroundColor = active
-            ? UIColor.systemBlue.withAlphaComponent(0.1)
-            : UIColor.clear
-
-        button.titleEdgeInsets = UIEdgeInsets(top: 30, left: -24, bottom: 0, right: 0)
-        button.imageEdgeInsets = UIEdgeInsets(top: -10, left: 0, bottom: 10, right: -40)
-
-        button.contentHorizontalAlignment = .center
-    }
     
     private func setupChartStyle() {
 
         lineChartView.chartDescription.enabled = false
         lineChartView.backgroundColor = .white
 
-        // Disable zoom
         lineChartView.setScaleEnabled(false)
         lineChartView.pinchZoomEnabled = false
 
         // ===== LEGEND =====
         let legend = lineChartView.legend
         legend.enabled = true
-        legend.horizontalAlignment = .center
+
         legend.verticalAlignment = .bottom
-        legend.orientation = .horizontal
-        legend.form = .square
+        legend.horizontalAlignment = .right   // mentok kanan
+        legend.orientation = .horizontal      // 🔥 horizontal
+
+        legend.drawInside = false
+        legend.wordWrapEnabled = true
+
+        legend.form = .circle
+        legend.formSize = 8
+
+        legend.xEntrySpace = 6
+        legend.yEntrySpace = 3
+
+        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
+        legend.maxSizePercent = 1.0
+
+        lineChartView.extraBottomOffset = 12   // 🔥 margin dari chart ke legend       // 🔥 penting supaya tidak potong chart
 
         // ===== X AXIS =====
         let xAxis = lineChartView.xAxis
@@ -529,24 +657,18 @@ final class Home: UIViewController {
         // ===== LEFT AXIS =====
         let leftAxis = lineChartView.leftAxis
         leftAxis.axisMinimum = 0
-        leftAxis.axisMaximum = 1_000_000   // ⬅️ PENTING
         leftAxis.drawGridLinesEnabled = true
         leftAxis.labelFont = .systemFont(ofSize: 10)
 
-        // ===== RIGHT AXIS (mirror Android) =====
+        // ===== RIGHT AXIS =====
         let rightAxis = lineChartView.rightAxis
-        rightAxis.enabled = true
-        rightAxis.axisMinimum = 0
-        rightAxis.axisMaximum = 1_000_000  // ⬅️ PENTING
-        rightAxis.drawGridLinesEnabled = false
-        rightAxis.labelFont = .systemFont(ofSize: 10)
+        rightAxis.enabled = false
 
-        // Format 1.000.000
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.groupingSeparator = "."
+
         leftAxis.valueFormatter = DefaultAxisValueFormatter(formatter: formatter)
-        rightAxis.valueFormatter = DefaultAxisValueFormatter(formatter: formatter)
     }
     
     private func configureGridButton(_ button: UIButton, title: String) {
@@ -594,14 +716,14 @@ final class Home: UIViewController {
 
         var colorIndex = 0
 
-        // 🔥 LOOP SUBDIT
+        // LOOP SUBDIT
         for (subdit, monthsValue) in dataMap {
 
             guard let months = monthsValue as? [String: Any] else { continue }
 
             var entries: [ChartDataEntry] = []
 
-            // 🔥 LOOP BULAN
+            // LOOP BULAN
             for (bulanStr, detailValue) in months {
 
                 guard
@@ -611,7 +733,12 @@ final class Home: UIViewController {
                     let terserap = Double(terserapStr)
                 else { continue }
 
-                entries.append(ChartDataEntry(x: xValue, y: terserap))
+                entries.append(
+                    ChartDataEntry(
+                        x: xValue,
+                        y: terserap
+                    )
+                )
 
                 if terserap > globalMaxY {
                     globalMaxY = terserap
@@ -622,7 +749,10 @@ final class Home: UIViewController {
 
             if !entries.isEmpty {
 
-                let dataSet = LineChartDataSet(entries: entries, label: subdit)
+                let dataSet = LineChartDataSet(
+                    entries: entries,
+                    label: subdit
+                )
 
                 let color = colors[colorIndex % colors.count]
 
@@ -641,13 +771,13 @@ final class Home: UIViewController {
         let lineData = LineChartData(dataSets: dataSets)
         lineChartView.data = lineData
 
-        // 🔥 AUTO SCALE (NO HARDCODE)
+        // AUTO SCALE
         lineChartView.leftAxis.axisMinimum = 0
         lineChartView.leftAxis.axisMaximum = globalMaxY * 1.2
         lineChartView.leftAxis.labelCount = 5
         lineChartView.leftAxis.forceLabelsEnabled = false
 
-        // 🔥 BULAN DI ATAS
+        // BULAN
         lineChartView.xAxis.labelPosition = .top
         lineChartView.xAxis.granularity = 1
         lineChartView.xAxis.axisMinimum = 1
@@ -655,12 +785,29 @@ final class Home: UIViewController {
         lineChartView.xAxis.valueFormatter = MonthValueFormatter()
         lineChartView.xAxis.drawGridLinesEnabled = true
 
-        // 🔥 STYLE MIRIP ANDROID
+        // ===== LEGEND =====
+        let legend = lineChartView.legend
+        legend.enabled = true
+
+        legend.verticalAlignment = .bottom
+        legend.horizontalAlignment = .right   // mentok kanan
+        legend.orientation = .horizontal      // 🔥 horizontal
+
+        legend.drawInside = false
+        legend.wordWrapEnabled = true
+
+        legend.form = .circle
+        legend.formSize = 8
+
+        legend.xEntrySpace = 6
+        legend.yEntrySpace = 3
+
+        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
+        legend.maxSizePercent = 1.0
+
+        lineChartView.extraBottomOffset = 20
+        // STYLE
         lineChartView.rightAxis.enabled = false
-        lineChartView.legend.enabled = true
-        lineChartView.legend.horizontalAlignment = .center
-        lineChartView.legend.verticalAlignment = .bottom
-        lineChartView.legend.form = .circle
 
         lineChartView.animate(xAxisDuration: 1.0)
         lineChartView.notifyDataSetChanged()
@@ -668,7 +815,13 @@ final class Home: UIViewController {
     
     
     
-    
+    @objc private func onTapMenuAbsen(_ sender: UIControl) {
+
+        guard let dari = sender.accessibilityIdentifier else { return }
+
+        cekabsen(dari: dari)
+    }
+
     func setBerita(_ items: [BeritaItem]) {
 
         beritaItems = items
@@ -715,6 +868,8 @@ final class Home: UIViewController {
             self.tvIsi.text = nextVC.item.isi.hendry_htmlToPlain()
         }
     }
+    
+ 
     
 }
 
@@ -1027,3 +1182,5 @@ class MonthValueFormatter: AxisValueFormatter {
         return String(Int(value))
     }
 }
+
+

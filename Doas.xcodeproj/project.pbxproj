@@ -162,6 +162,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Doas/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Aplikasi membutuhkan kamera untuk mengambil foto bukti absensi";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Aplikasi membutuhkan verifikasi biometrik untuk absensi";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Aplikasi membutuhkan lokasi untuk validasi absensi";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Aplikasi menyimpan foto absensi";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -196,6 +200,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Doas/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Aplikasi membutuhkan kamera untuk mengambil foto bukti absensi";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Aplikasi membutuhkan verifikasi biometrik untuk absensi";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Aplikasi membutuhkan lokasi untuk validasi absensi";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Aplikasi menyimpan foto absensi";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

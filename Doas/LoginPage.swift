@@ -283,9 +283,9 @@ final class LoginPage: UIViewController {
     }
     private func logboundFlow() {
 
-        AuthManager().checkAuth(
-            endpoint: "api/auth-check",
+        AuthManager(endpoint: "api/auth-check").checkAuth(
             params: nil,
+
             onSuccess: { json in
 
                 guard let aesKey = json["aes_key"] as? String else {
@@ -300,9 +300,11 @@ final class LoginPage: UIViewController {
                 home.modalPresentationStyle = .fullScreen
                 self.present(home, animated: true)
             },
+
             onLogout: { message in
                 self.showAlert(message)
             },
+
             onLoading: { _ in }
         )
     }

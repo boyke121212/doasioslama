@@ -5,10 +5,19 @@ final class AuthManager {
 
     private let baseURL = AppConfig.BASE_URL
     private let securePrefs = SecurePrefs()
+    private let endpoint: String
 
-    // =========================================================
+    // ======================================================
+    // CONSTRUCTOR (SAMA DENGAN ANDROID)
+    // ======================================================
+
+    init(endpoint: String) {
+        self.endpoint = endpoint
+    }
+
+    // ======================================================
     // ANTI RACE CONDITION
-    // =========================================================
+    // ======================================================
 
     private var isRefreshing = false
     private var waitingQueue: [() -> Void] = []
@@ -34,6 +43,7 @@ final class AuthManager {
                 self.waitingQueue.forEach { $0() }
                 self.waitingQueue.removeAll()
             },
+
             onLogout: { msg in
                 self.isRefreshing = false
                 self.waitingQueue.removeAll()
@@ -42,19 +52,22 @@ final class AuthManager {
         )
     }
 
-    // =========================================================
-    // PUBLIC API
-    // =========================================================
+    // ======================================================
+    // CHECK AUTH
+    // ======================================================
 
     func checkAuth(
-        endpoint: String,
         params: [String: String]? = nil,
         onSuccess: @escaping ([String: Any]) -> Void,
         onLogout: @escaping (String) -> Void,
         onLoading: @escaping (Bool) -> Void
     ) {
 
-        guard ensureInternet(onLoading: onLoading, onLogout: onLogout) else { return }
+        if !Auto.isInternetAvailable() {
+            onLoading(false)
+            onLogout("Tidak ada koneksi internet")
+            return
+        }
 
         guard let accessToken = securePrefs.getAccessToken(),
               let refreshToken = securePrefs.getRefreshToken(),
@@ -62,52 +75,48 @@ final class AuthManager {
               !refreshToken.isEmpty else {
 
             onLogout("Sesi tidak valid")
-            forceLogout()
             return
         }
 
         requestAuth(
-            endpoint: endpoint,
             accessToken: accessToken,
             params: params,
-            onLoading: onLoading,
             onSuccess: onSuccess,
             onUnauthorized: {
 
-                onLoading(false)
-
                 self.refreshTokenSafe(
+
                     onSuccess: {
                         self.checkAuth(
-                            endpoint: endpoint,
                             params: params,
                             onSuccess: onSuccess,
                             onLogout: onLogout,
                             onLoading: onLoading
                         )
                     },
+
                     onLogout: onLogout
                 )
             },
             onError: { message in
                 onLoading(false)
                 self.showToast(message)
-            }
+            },
+            onLoading: onLoading
         )
     }
 
-    // =========================================================
+    // ======================================================
     // REQUEST AUTH
-    // =========================================================
+    // ======================================================
 
     private func requestAuth(
-        endpoint: String,
         accessToken: String,
         params: [String: String]?,
-        onLoading: @escaping (Bool) -> Void,
         onSuccess: @escaping ([String: Any]) -> Void,
         onUnauthorized: @escaping () -> Void,
-        onError: @escaping (String) -> Void
+        onError: @escaping (String) -> Void,
+        onLoading: @escaping (Bool) -> Void
     ) {
 
         guard let url = URL(string: baseURL + endpoint) else {
@@ -127,15 +136,19 @@ final class AuthManager {
         request.setValue("ios", forHTTPHeaderField: "Platform")
 
         if let params = params {
+
             let bodyString = params
                 .map { "\($0.key)=\($0.value)" }
                 .joined(separator: "&")
+
             request.httpBody = bodyString.data(using: .utf8)
         }
 
         URLSession.shared.dataTask(with: request) { data, response, error in
 
             DispatchQueue.main.async {
+
+                onLoading(false)
 
                 if let error = error {
                     onError(error.localizedDescription)
@@ -154,6 +167,7 @@ final class AuthManager {
 
                 guard let data = data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+
                     onError("Response server tidak valid")
                     return
                 }
@@ -168,9 +182,149 @@ final class AuthManager {
         }.resume()
     }
 
-    // =========================================================
+    // ======================================================
+    // UPLOAD FOTO (PORT DARI uploadMultipartAuth)
+    // ======================================================
+
+    func uploadFoto(
+        files: [URL]?,
+        params: [String: String],
+        onSuccess: @escaping ([String: Any]) -> Void,
+        onError: @escaping (String) -> Void,
+        onLogout: @escaping (String) -> Void,
+        onLoading: @escaping (Bool) -> Void
+    ) {
+
+        if !Auto.isInternetAvailable() {
+            onLoading(false)
+            onLogout("Tidak ada koneksi internet")
+            return
+        }
+
+        guard let accessToken = securePrefs.getAccessToken(),
+              !accessToken.isEmpty else {
+
+            onLogout("Sesi tidak valid")
+            return
+        }
+
+        let realFiles = (files != nil && files!.isEmpty) ? nil : files
+
+        guard let url = URL(string: baseURL + endpoint) else {
+            onError("URL tidak valid")
+            return
+        }
+
+        onLoading(true)
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue(DeviceSecurityHelper.getDeviceHash(), forHTTPHeaderField: "X-Device-Hash")
+        request.setValue(DeviceSecurityHelper.getAppSignatureHash(), forHTTPHeaderField: "X-App-Signature")
+        request.setValue("ios", forHTTPHeaderField: "Platform")
+
+        var body = Data()
+
+        for (key, value) in params {
+
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+
+        realFiles?.enumerated().forEach { index, fileURL in
+
+            guard let fileData = try? Data(contentsOf: fileURL) else { return }
+
+            let mime: String
+
+            if fileURL.path.lowercased().hasSuffix(".png") {
+                mime = "image/png"
+            } else if fileURL.path.lowercased().hasSuffix(".webp") {
+                mime = "image/webp"
+            } else {
+                mime = "image/jpeg"
+            }
+
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append(
+                "Content-Disposition: form-data; name=\"foto\(index + 1)\"; filename=\"\(fileURL.lastPathComponent)\"\r\n"
+                    .data(using: .utf8)!
+            )
+            body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
+            body.append(fileData)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        request.httpBody = body
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+
+            DispatchQueue.main.async {
+
+                onLoading(false)
+
+                if let error = error {
+                    onError(error.localizedDescription)
+                    return
+                }
+
+                guard let http = response as? HTTPURLResponse else {
+                    onError("Response tidak valid")
+                    return
+                }
+
+                if http.statusCode == 401 {
+
+                    self.refreshTokenSafe(
+
+                        onSuccess: {
+                            self.uploadFoto(
+                                files: files,
+                                params: params,
+                                onSuccess: onSuccess,
+                                onError: onError,
+                                onLogout: onLogout,
+                                onLoading: onLoading
+                            )
+                        },
+
+                        onLogout: { message in
+                            onLogout(message)
+                        }
+                    )
+
+                    return
+                }
+
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+
+                    onError("Response server tidak valid")
+                    return
+                }
+
+                realFiles?.forEach { file in
+                    try? FileManager.default.removeItem(at: file)
+                }
+
+                onSuccess(json)
+            }
+
+        }.resume()
+    }
+
+    // ======================================================
     // REFRESH TOKEN
-    // =========================================================
+    // ======================================================
 
     private func refreshTokenOnly(
         onSuccess: @escaping () -> Void,
@@ -179,6 +333,7 @@ final class AuthManager {
 
         guard let refreshToken = securePrefs.getRefreshToken(),
               !refreshToken.isEmpty else {
+
             onLogout("Refresh token tidak ditemukan")
             return
         }
@@ -201,16 +356,9 @@ final class AuthManager {
 
             DispatchQueue.main.async {
 
-                if let httpResponse = response as? HTTPURLResponse,
-                   httpResponse.statusCode == 401 {
-
-                    self.securePrefs.clear()
-                    onLogout("Sesi berakhir")
-                    return
-                }
-
                 guard let data = data,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+
                     onLogout("Response refresh tidak valid")
                     return
                 }
@@ -219,6 +367,7 @@ final class AuthManager {
                 let newRefresh = json["refresh_token"] as? String ?? ""
 
                 if newAccess.isEmpty || newRefresh.isEmpty {
+
                     onLogout("Refresh token tidak valid")
                     return
                 }
@@ -232,39 +381,9 @@ final class AuthManager {
         }.resume()
     }
 
-    // =========================================================
-    // FORCE LOGOUT
-    // =========================================================
-
-    func forceLogout() {
-        securePrefs.clear()
-
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = scene.windows.first else {
-            return
-        }
-
-        window.rootViewController = LoginPage()
-        window.makeKeyAndVisible()
-    }
-
-    // =========================================================
-    // INTERNET CHECK
-    // =========================================================
-
-    private func ensureInternet(
-        onLoading: ((Bool) -> Void)?,
-        onLogout: ((String) -> Void)?
-    ) -> Bool {
-
-        if !Auto.isInternetAvailable() {
-            onLoading?(false)
-            onLogout?("Tidak ada koneksi internet")
-            return false
-        }
-
-        return true
-    }
+    // ======================================================
+    // TOAST
+    // ======================================================
 
     private func showToast(_ message: String) {
 
@@ -277,10 +396,4 @@ final class AuthManager {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
         root.present(alert, animated: true)
     }
-}//
-//  AuthManager.swift
-//  Doas
-//
-//  Created by Admin on 03/03/26.
-//
-
+}
