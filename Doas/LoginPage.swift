@@ -1,6 +1,6 @@
 import UIKit
 
-final class LoginPage: UIViewController {
+final class LoginPage: Boyke {
     
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -21,6 +21,7 @@ final class LoginPage: UIViewController {
         super.viewDidLoad()
         setupUI()
     }
+
     
     // =================================================
     // UI SETUP
@@ -169,7 +170,6 @@ final class LoginPage: UIViewController {
         stack.addArrangedSubview(usernameField)
         stack.addArrangedSubview(passwordField)
         stack.addArrangedSubview(loginButton)
-        
         // Bottom constraint
         cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40).isActive = true
     }
@@ -177,7 +177,6 @@ final class LoginPage: UIViewController {
     // =================================================
     // LOGIN ACTION
     // =================================================
-    
     @objc private func handleLogin() {
 
         let username = usernameField.text ?? ""
@@ -188,14 +187,18 @@ final class LoginPage: UIViewController {
             return
         }
 
-        guard let url = URL(string: "\(AppConfig.BASE_URL)cekdata") else { return }
+        showLoading()   // ← loading mulai
+
+        guard let url = URL(string: "\(AppConfig.BASE_URL)cekdata") else {
+            hideLoading()
+            return
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        // ===== DEVICE SECURITY =====
         let deviceHash = DeviceSecurityHelper.getDeviceHash()
         let appSignature = DeviceSecurityHelper.getAppSignatureHash()
 
@@ -206,16 +209,13 @@ final class LoginPage: UIViewController {
         let params: [String: String] = [
             "username": username,
             "password": password,
-
             "device_hash": deviceHash,
             "app_signature": appSignature,
-
             "is_rooted": isRooted ? "1" : "0",
             "is_emulator": isEmulator ? "1" : "0",
             "is_fake_gps": "0",
             "is_debug": isDebug ? "1" : "0",
             "is_installer_valid": "1",
-
             "platform": "ios"
         ]
 
@@ -228,6 +228,8 @@ final class LoginPage: UIViewController {
         URLSession.shared.dataTask(with: request) { data, response, error in
 
             DispatchQueue.main.async {
+
+                self.hideLoading()   // ← loading berhenti
 
                 if let error = error {
                     self.showAlert(error.localizedDescription)
@@ -245,11 +247,13 @@ final class LoginPage: UIViewController {
                 }
 
                 if httpResponse.statusCode != 200 {
+
                     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                         self.showAlert(json["message"] as? String ?? "Login gagal")
                     } else {
                         self.showAlert("Login gagal")
                     }
+
                     return
                 }
 
@@ -269,6 +273,7 @@ final class LoginPage: UIViewController {
                     self.logboundFlow()
 
                 } else {
+
                     self.showAlert(json["message"] as? String ?? "Login gagal")
                 }
             }
@@ -287,7 +292,7 @@ final class LoginPage: UIViewController {
             params: nil,
 
             onSuccess: { json in
-
+                self.hideLoading()
                 guard let aesKey = json["aes_key"] as? String else {
                     self.showAlert("AES Key tidak ditemukan")
                     return
@@ -302,6 +307,7 @@ final class LoginPage: UIViewController {
             },
 
             onLogout: { message in
+                self.hideLoading()
                 self.showAlert(message)
             },
 

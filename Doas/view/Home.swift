@@ -1,95 +1,11 @@
 import UIKit
 
 import DGCharts
-
-final class MenuItemView: UIControl {
-
-    private let stack = UIStackView()
-    private let imageView = UIImageView()
-    private let titleLabel = UILabel()
-
-    private var activeColor: UIColor = .systemBlue
-    private var inactiveColor: UIColor = .systemGray
-
-    init(title: String, iconName: String, active: Bool = false) {
-        super.init(frame: .zero)
-        setup()
-        configure(title: title, iconName: iconName, active: active)
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
-    }
-
-    private func setup() {
-
-        translatesAutoresizingMaskIntoConstraints = false
-
-        stack.axis = .vertical
-        stack.alignment = .center
-        stack.spacing = 4
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.isUserInteractionEnabled = false   // 🔥 penting
-
-        imageView.contentMode = .scaleAspectFit
-        imageView.tintColor = inactiveColor
-        imageView.setContentHuggingPriority(.required, for: .vertical)
-        imageView.setContentCompressionResistancePriority(.required, for: .vertical)
-        imageView.isUserInteractionEnabled = false
-
-        titleLabel.font = UIFont.systemFont(ofSize: 10)
-        titleLabel.textColor = inactiveColor
-        titleLabel.textAlignment = .center
-        titleLabel.numberOfLines = 1
-        titleLabel.isUserInteractionEnabled = false
-
-        addSubview(stack)
-
-        stack.addArrangedSubview(imageView)
-        stack.addArrangedSubview(titleLabel)
-
-        NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 4),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4)
-        ])
-
-        heightAnchor.constraint(equalToConstant: 64).isActive = true
-    }
-
-    // 🔥 HARUS di luar setup()
-    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        return bounds.contains(point)
-    }
-
-    func configure(title: String, iconName: String, active: Bool) {
-        titleLabel.text = title
-
-        if let img = UIImage(named: iconName)?.withRenderingMode(.alwaysTemplate) {
-            imageView.image = img
-        } else {
-            imageView.image = nil
-        }
-
-        setActive(active)
-    }
-
-    func setActive(_ active: Bool) {
-        let color = active ? activeColor : inactiveColor
-
-        titleLabel.font = UIFont.systemFont(ofSize: 10, weight: active ? .bold : .regular)
-        titleLabel.textColor = color
-        imageView.tintColor = color
-
-        backgroundColor = active ? UIColor.systemBlue.withAlphaComponent(0.1) : .clear
-        layer.cornerRadius = 10
-    }
-}
+import Network
 
 final class Home: Boyke, UIScrollViewDelegate {
-    
+    private let monitor = NWPathMonitor()
+    private let monitorQueue = DispatchQueue(label: "InternetMonitor")
     // MARK: - Scroll Structure
     let lineChartView = LineChartView()
     let scrollView = UIScrollView()
@@ -149,6 +65,9 @@ final class Home: Boyke, UIScrollViewDelegate {
     var currentIndex = 0
     var rawDashboardJSON: [String: Any]?
 
+    // Custom legend container (vertical stack of rows)
+    private let customLegend = UIStackView()
+
     // Collapsing header
     private let headerMaxHeight: CGFloat = 280
     private let headerMinHeight: CGFloat = 140
@@ -168,11 +87,32 @@ final class Home: Boyke, UIScrollViewDelegate {
         pageController.delegate = self
         setupChartStyle()   // ⬅️ TAMBAHKAN INI
         setupAbsenMenu()
+        btInfo.addTarget(self, action: #selector(ontapInfo), for: .touchUpInside)
+        btDoas.addTarget(self, action: #selector(ontapDoas), for: .touchUpInside)
+        btLog.addTarget(self, action: #selector(ontapLog), for: .touchUpInside)
+        self.monitorInternet()
+        btProfile.addTarget(self, action: #selector(bukaprofile), for: .touchUpInside)
+
     }
-    
+    @objc private func bukaprofile() {
+        let vc = ProfileActivity()
+        vc.modalPresentationStyle = .fullScreen
+        present(vc, animated: false)
+    }
+    @objc private func ontapInfo() {
+      openPage(Berita())
+    }
+    @objc private func ontapDoas() {
+      openPage(Doas())
+    }
+    @objc private func ontapLog() {
+     openPage(History())
+    }
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         refreshData()
+        print("Hero height home: ", heroContainer.frame.height)
+
     }
     
     
@@ -188,7 +128,7 @@ final class Home: Boyke, UIScrollViewDelegate {
         view.addSubview(scrollView)
         
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
@@ -501,6 +441,7 @@ final class Home: Boyke, UIScrollViewDelegate {
         ])
         
         let dashboardTitle = UILabel()
+    
         dashboardTitle.text = "Dashboard Anggaran"
         dashboardTitle.font = UIFont.boldSystemFont(ofSize: 16)
         
@@ -523,12 +464,15 @@ final class Home: Boyke, UIScrollViewDelegate {
 
         stack.addArrangedSubview(lineChartView)
         
-        let userTitle = UILabel()
-        userTitle.text = "User Terakhir"
-        userTitle.font = UIFont.boldSystemFont(ofSize: 14)
-        
-        userContainer.axis = .vertical
-        userContainer.spacing = 12
+        // Custom legend below the chart
+        customLegend.axis = .vertical
+        customLegend.spacing = 6
+        customLegend.alignment = .fill
+        customLegend.distribution = .fill
+        stack.addArrangedSubview(customLegend)
+
+        // Add top spacing before dashboard title without extra view
+        stack.setCustomSpacing(30, after: customLegend)
         
         stack.addArrangedSubview(dashboardTitle)
         stack.addArrangedSubview(tvTahunAktif)
@@ -537,7 +481,10 @@ final class Home: Boyke, UIScrollViewDelegate {
         stack.addArrangedSubview(summaryContainer)
         stack.addArrangedSubview(chartTitle)
         stack.addArrangedSubview(chartPlaceholder)
-        stack.addArrangedSubview(userTitle)
+        userContainer.axis = .vertical
+        userContainer.spacing = 8
+        userContainer.alignment = .fill
+        userContainer.distribution = .fill
         stack.addArrangedSubview(userContainer)
     }
     
@@ -577,8 +524,15 @@ final class Home: Boyke, UIScrollViewDelegate {
         tvBulanAwal.text = "Bulan Awal: \(data.bulanAwal)"
 
         // CLEAR OLD
-        summaryContainer.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        userContainer.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for view in summaryContainer.arrangedSubviews {
+            summaryContainer.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        for view in userContainer.arrangedSubviews {
+            userContainer.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
 
         // SUMMARY SUBDIT (1:1 Android LinearLayout)
         let formatter = NumberFormatter()
@@ -627,23 +581,23 @@ final class Home: Boyke, UIScrollViewDelegate {
 
         // ===== LEGEND =====
         let legend = lineChartView.legend
-        legend.enabled = true
+        legend.enabled = false
 
-        legend.verticalAlignment = .bottom
-        legend.horizontalAlignment = .right   // mentok kanan
-        legend.orientation = .horizontal      // 🔥 horizontal
+//        legend.verticalAlignment = .bottom
+//        legend.horizontalAlignment = .right   // mentok kanan
+//        legend.orientation = .horizontal      // 🔥 horizontal
 
-        legend.drawInside = false
-        legend.wordWrapEnabled = true
+//        legend.drawInside = false
+//        legend.wordWrapEnabled = true
 
-        legend.form = .circle
-        legend.formSize = 8
+//        legend.form = .circle
+//        legend.formSize = 8
 
-        legend.xEntrySpace = 6
-        legend.yEntrySpace = 3
+//        legend.xEntrySpace = 6
+//        legend.yEntrySpace = 3
 
-        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
-        legend.maxSizePercent = 1.0
+//        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
+//        legend.maxSizePercent = 1.0
 
         lineChartView.extraBottomOffset = 12   // 🔥 margin dari chart ke legend       // 🔥 penting supaya tidak potong chart
 
@@ -706,12 +660,11 @@ final class Home: Boyke, UIScrollViewDelegate {
         var globalMaxY: Double = 0
 
         let colors: [UIColor] = [
-            .systemBlue,
-            .systemRed,
-            .systemGreen,
-            .systemPink,
-            .systemTeal,
-            .systemOrange
+            UIColor.blue,      // Color.BLUE
+            UIColor.red,       // Color.RED
+            UIColor.green,     // Color.GREEN
+            UIColor.magenta,   // Color.MAGENTA
+            UIColor.cyan       // Color.CYAN
         ]
 
         var colorIndex = 0
@@ -771,6 +724,92 @@ final class Home: Boyke, UIScrollViewDelegate {
         let lineData = LineChartData(dataSets: dataSets)
         lineChartView.data = lineData
 
+        // Build custom legend (ordered rows, left-aligned)
+        lineChartView.legend.enabled = false
+
+        // Clear old legend rows
+        customLegend.arrangedSubviews.forEach { row in
+            customLegend.removeArrangedSubview(row)
+            row.removeFromSuperview()
+        }
+
+        // Make spacing a bit larger so rows aren't too tight
+        customLegend.spacing = 10
+
+        // Helper: create a legend item view
+        func makeLegendItem(color: UIColor, text: String) -> UIView {
+            let dot = UIView()
+            dot.translatesAutoresizingMaskIntoConstraints = false
+            dot.backgroundColor = color
+            dot.layer.cornerRadius = 4
+            NSLayoutConstraint.activate([
+                dot.widthAnchor.constraint(equalToConstant: 8),
+                dot.heightAnchor.constraint(equalToConstant: 8)
+            ])
+
+            let label = UILabel()
+            label.font = UIFont.systemFont(ofSize: 11)
+            label.textColor = .darkGray
+            label.text = text
+
+            let h = UIStackView(arrangedSubviews: [dot, label])
+            h.axis = .horizontal
+            h.alignment = .center
+            h.spacing = 6
+            return h
+        }
+
+        // Map dataset by label for quick lookup
+        var dataSetByLabel: [String: LineChartDataSet] = [:]
+        for set in dataSets {
+            if let label = set.label { dataSetByLabel[label] = set }
+        }
+
+        // Desired ordering per row
+        let row1Labels = ["Subdit 1", "Subdit 2", "Subdit 3", "Subdit 4", "Subdit 5"]
+        let row2Labels = ["Subdit Staff", "Pimpinan"]
+
+        func makeRow(with labels: [String]) -> UIStackView {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.alignment = .center
+            row.spacing = 12
+            row.distribution = .fill
+            for label in labels {
+                if let set = dataSetByLabel[label] {
+                    let color = set.colors.first ?? .label
+                    let item = makeLegendItem(color: color, text: label)
+                    row.addArrangedSubview(item)
+                }
+            }
+            return row
+        }
+
+        // Add rows to customLegend
+        let row1 = makeRow(with: row1Labels)
+        let row2 = makeRow(with: row2Labels)
+        customLegend.addArrangedSubview(row1)
+        customLegend.addArrangedSubview(row2)
+
+        // If there are any remaining datasets not covered by the two rows, add them as a third row (optional fallback)
+        let covered = Set(row1Labels + row2Labels)
+        let remaining = dataSets.compactMap { $0.label }.filter { !covered.contains($0) }
+        if !remaining.isEmpty {
+            let row3 = UIStackView()
+            row3.axis = .horizontal
+            row3.alignment = .center
+            row3.spacing = 12
+            row3.distribution = .fill
+            for label in remaining {
+                if let set = dataSetByLabel[label] {
+                    let color = set.colors.first ?? .label
+                    let item = makeLegendItem(color: color, text: label)
+                    row3.addArrangedSubview(item)
+                }
+            }
+            customLegend.addArrangedSubview(row3)
+        }
+
         // AUTO SCALE
         lineChartView.leftAxis.axisMinimum = 0
         lineChartView.leftAxis.axisMaximum = globalMaxY * 1.2
@@ -786,24 +825,24 @@ final class Home: Boyke, UIScrollViewDelegate {
         lineChartView.xAxis.drawGridLinesEnabled = true
 
         // ===== LEGEND =====
-        let legend = lineChartView.legend
-        legend.enabled = true
+//        let legend = lineChartView.legend
+//        legend.enabled = true
 
-        legend.verticalAlignment = .bottom
-        legend.horizontalAlignment = .right   // mentok kanan
-        legend.orientation = .horizontal      // 🔥 horizontal
+//        legend.verticalAlignment = .bottom
+//        legend.horizontalAlignment = .right   // mentok kanan
+//        legend.orientation = .horizontal      // 🔥 horizontal
 
-        legend.drawInside = false
-        legend.wordWrapEnabled = true
+//        legend.drawInside = false
+//        legend.wordWrapEnabled = true
 
-        legend.form = .circle
-        legend.formSize = 8
+//        legend.form = .circle
+//        legend.formSize = 8
 
-        legend.xEntrySpace = 6
-        legend.yEntrySpace = 3
+//        legend.xEntrySpace = 6
+//        legend.yEntrySpace = 3
 
-        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
-        legend.maxSizePercent = 1.0
+//        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
+//        legend.maxSizePercent = 1.0
 
         lineChartView.extraBottomOffset = 20
         // STYLE
@@ -868,9 +907,25 @@ final class Home: Boyke, UIScrollViewDelegate {
             self.tvIsi.text = nextVC.item.isi.hendry_htmlToPlain()
         }
     }
-    
+    func monitorInternet() {
+
+        monitor.pathUpdateHandler = { path in
+
+            if path.status == .satisfied {
+
+                DispatchQueue.main.async {
+
+                    self.refreshData()
+                }
+            }
+        }
+
+        monitor.start(queue: monitorQueue)
+    }
  
-    
+    override func viewDidDisappear(_ animated: Bool) {
+        monitor.cancel()
+    }
 }
 
 extension Home: UIPageViewControllerDataSource, UIPageViewControllerDelegate {

@@ -265,6 +265,7 @@ extension Home {
                         if absen.lowercased() == "belum" {
 
                             let vc = AbsenHadir()
+                            vc.dari = "ADL"
                             vc.modalPresentationStyle = .fullScreen
                             self.present(vc, animated: true)
 
@@ -329,36 +330,31 @@ extension Home {
 
                     let absen = json["absen"] as? String ?? ""
                     let ketam = json["ketam"] as? String ?? ""
-
-                    switch dari.lowercased() {
-
-                    case "status":
+                    if(dari=="status"){
                         self.startStatus(absen: absen, ketam: ketam)
-
-                    case "dik":
-                        self.startAbsen(absen: absen, target: AbsenDik.self, ketam: ketam)
-
-                    case "hadir":
-                        self.startAbsen(absen: absen, target: AbsenHadir.self, ketam: ketam)
-
-                    case "sakit":
-                        self.startAbsen(absen: absen, target: AbsenSakit.self, ketam: ketam)
-
-                    case "bko":
-                        self.startAbsen(absen: absen, target: AbsenBko.self, ketam: ketam)
-
-                    case "cuti":
-                        self.startAbsen(absen: absen, target: AbsenCuti.self, ketam: ketam)
-
-                    default:
-                        break
+                    }else{
+                        let dar = dari.uppercased()
+                        self.startAbsen(absen: absen, target: AbsenHadir.self, ketam: ketam,dari:dar)
                     }
+                  
                 }
             },
 
             onLogout: { message in
                 DispatchQueue.main.async {
-                    self.showAlert(message)
+                    SecurePrefs().clear()
+                    let vc = MainActivity()
+
+                    guard let window = UIApplication.shared
+                        .connectedScenes
+                        .compactMap({ $0 as? UIWindowScene })
+                        .first?
+                        .windows
+                        .first else { return }
+
+                    window.rootViewController = vc
+                    window.makeKeyAndVisible()
+                    
                 }
             },
 
@@ -385,7 +381,7 @@ extension Home {
         } else {
             let vc = Statuses()
             vc.modalPresentationStyle = .fullScreen
-            present(vc, animated: true)
+            present(vc, animated: false)
         }
     }
 }
@@ -397,17 +393,15 @@ extension Home {
 
 extension Home {
 
-    func startAbsen(absen: String, target: UIViewController.Type, ketam: String) {
+    func startAbsen(absen: String, target: UIViewController.Type, ketam: String,dari:String) {
 
         if absen.lowercased() == "belum" {
 
-            let vc = target.init()
-
-            if var absenVC = vc as? HasKetam {
-                absenVC.ketam = ketam
-            }
-
+            let vc = AbsenHadir()
+            vc.dari = dari.uppercased()
+            vc.ketam = ketam
             vc.modalPresentationStyle = .fullScreen
+            self.present(vc, animated: true)
             present(vc, animated: true)
 
         } else {
@@ -463,6 +457,4 @@ private func hendry_makeHTMLAttributed(_ html: String, baseFontSize: CGFloat = 1
     ]
     return try? NSAttributedString(data: data, options: options, documentAttributes: nil)
 }
-
-
 

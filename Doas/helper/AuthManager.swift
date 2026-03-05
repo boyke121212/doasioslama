@@ -48,6 +48,7 @@ final class AuthManager {
                 self.isRefreshing = false
                 self.waitingQueue.removeAll()
                 onLogout(msg)
+            
             }
         )
     }
@@ -75,6 +76,7 @@ final class AuthManager {
               !refreshToken.isEmpty else {
 
             onLogout("Sesi tidak valid")
+            self.forceLogout(message: " dari access kosong Anda telah Logout")
             return
         }
 
@@ -106,6 +108,22 @@ final class AuthManager {
         )
     }
 
+    func forceLogout(message: String) {
+
+        securePrefs.clear()
+
+        self.securePrefs.clear()
+
+        let alert = UIAlertController(
+            title: "Informasi",
+            message: message,
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            self.goToMainActivity()
+        })
+    }
     // ======================================================
     // REQUEST AUTH
     // ======================================================
@@ -325,7 +343,6 @@ final class AuthManager {
     // ======================================================
     // REFRESH TOKEN
     // ======================================================
-
     private func refreshTokenOnly(
         onSuccess: @escaping () -> Void,
         onLogout: @escaping (String) -> Void
@@ -356,26 +373,58 @@ final class AuthManager {
 
             DispatchQueue.main.async {
 
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-
-                    onLogout("Response refresh tidak valid")
+                guard let data = data else {
+                    onLogout("Response kosong")
                     return
                 }
 
-                let newAccess = json["access_token"] as? String ?? ""
-                let newRefresh = json["refresh_token"] as? String ?? ""
+                do {
+                    
+                    let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+                    
+                    let status = json["status"] as? Int ?? 0
+                    
+                    let messages = json["messages"] as? [String: Any]
+                    let message = messages?["error"] as? String ?? "Terjadi kesalahan"
+                    
+                    // ===== jika backend kirim 401 =====
+                    if status == 401 {
 
-                if newAccess.isEmpty || newRefresh.isEmpty {
+                        self.securePrefs.clear()
 
-                    onLogout("Refresh token tidak valid")
-                    return
+                        let alert = UIAlertController(
+                            title: "Informasi",
+                            message: message,
+                            preferredStyle: .alert
+                        )
+
+                        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                            self.goToMainActivity()
+                        })
+
+                        return
+                    }
+                
+
+                    // ===== jika sukses =====
+                    let newAccess = json["access_token"] as? String ?? ""
+                    let newRefresh = json["refresh_token"] as? String ?? ""
+
+                    if newAccess.isEmpty || newRefresh.isEmpty {
+
+                        onLogout(message)
+                        return
+                    }
+
+                    self.securePrefs.saveAccessToken(newAccess)
+                    self.securePrefs.saveRefreshToken(newRefresh)
+
+                    onSuccess()
+
+                } catch {
+
+                    onLogout("Response server tidak valid")
                 }
-
-                self.securePrefs.saveAccessToken(newAccess)
-                self.securePrefs.saveRefreshToken(newRefresh)
-
-                onSuccess()
             }
 
         }.resume()
@@ -395,5 +444,20 @@ final class AuthManager {
 
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
         root.present(alert, animated: true)
+    }
+    
+    func goToMainActivity() {
+
+        let vc = MainActivity()
+
+        guard let window = UIApplication.shared
+            .connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first?
+            .windows
+            .first else { return }
+
+        window.rootViewController = vc
+        window.makeKeyAndVisible()
     }
 }

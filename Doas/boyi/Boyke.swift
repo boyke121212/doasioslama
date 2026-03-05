@@ -9,6 +9,16 @@ class Boyke: UIViewController {
         super.viewDidLoad()
         initLoading()
     }
+    
+    func openPage(_ vc: UIViewController) {
+        vc.modalPresentationStyle = .fullScreen
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else { return }
+        
+        window.rootViewController = vc
+        window.makeKeyAndVisible()
+    }
 
     private func initLoading() {
 

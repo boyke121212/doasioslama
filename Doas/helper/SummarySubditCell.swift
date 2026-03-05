@@ -42,12 +42,6 @@ final class SummarySubditCollectionViewCell: UICollectionViewCell {
         fatalError()
     }
 
-    func bind(key: String, data: SummarySubdit) {
-
-        nameLabel.text = key
-        diajukanLabel.text = "Diajukan: \(data.diajukan)"
-        terserapLabel.text = "Terserap: \(data.terserap)"
-        persenLabel.text = "Persen: \(data.persen)%"
-    }
+ 
 }
 

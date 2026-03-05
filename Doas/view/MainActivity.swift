@@ -91,7 +91,7 @@ final class MainActivity: UIViewController {
         NSLayoutConstraint.activate([
             btLogin.heightAnchor.constraint(equalToConstant: 56)
         ])
-        
+        btLogin.isHidden = true
         btLogin.addTarget(self, action: #selector(goToLogin), for: .touchUpInside)
         
         bottomStack.addArrangedSubview(tvBareskrim)
