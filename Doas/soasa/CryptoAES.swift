@@ -31,14 +31,10 @@ final class CryptoAES {
 
     static func deriveKey(sessionKeyHex: String, deviceHash: String) -> Data {
 
-        let keyBytes = hexToBytes(sessionKeyHex)
+        let keyBytes  = hexToBytes(sessionKeyHex)
         let deviceBytes = Array(deviceHash.utf8)
 
-        let hmac = HMAC(
-            key: keyBytes,
-            variant: .sha2(.sha256)
-        )
-
+        let hmac = HMAC(key: keyBytes, variant: .sha2(.sha256))
         let result = try! hmac.authenticate(deviceBytes)
 
         return Data(result)
@@ -46,7 +42,7 @@ final class CryptoAES {
 
     // =========================================================
     // DECRYPT AES-256-CBC
-    // Base64(iv + cipherText)
+    // Base64(iv[16] + cipherText)
     // =========================================================
 
     static func decrypt(
@@ -54,27 +50,22 @@ final class CryptoAES {
         _ aesKeyHex: String
     ) -> String {
 
-        guard let allData = Data(base64Encoded: encryptedBase64) else {
-            return ""
-        }
+        // Setara decryptField() di Kotlin — skip kalau kosong atau "null"
+        guard !encryptedBase64.isEmpty, encryptedBase64 != "null" else { return "" }
 
-        let allBytes = [UInt8](allData)
+        // Harus valid base64 dan minimal 17 byte (16 IV + 1 data)
+        guard let allData = Data(base64Encoded: encryptedBase64),
+              allData.count > 16 else { return "" }
 
-        let iv = Array(allBytes.prefix(16))
-        let cipherText = Array(allBytes.dropFirst(16))
-
-        let key = hexToBytes(aesKeyHex)
+        let allBytes    = [UInt8](allData)
+        let iv          = Array(allBytes.prefix(16))
+        let cipherText  = Array(allBytes.dropFirst(16))
+        let key         = hexToBytes(aesKeyHex)
 
         do {
-            let aes = try AES(
-                key: key,
-                blockMode: CBC(iv: iv),
-                padding: .pkcs7
-            )
-
+            let aes = try AES(key: key, blockMode: CBC(iv: iv), padding: .pkcs7)
             let decrypted = try aes.decrypt(cipherText)
             return String(bytes: decrypted, encoding: .utf8) ?? ""
-
         } catch {
             print("AES decrypt failed:", error)
             return ""
@@ -91,21 +82,12 @@ final class CryptoAES {
     ) -> String {
 
         let key = hexToBytes(aesKeyHex)
-
-        let iv = AES.randomIV(16)
+        let iv  = AES.randomIV(16)
 
         do {
-            let aes = try AES(
-                key: key,
-                blockMode: CBC(iv: iv),
-                padding: .pkcs7
-            )
-
+            let aes    = try AES(key: key, blockMode: CBC(iv: iv), padding: .pkcs7)
             let cipher = try aes.encrypt(Array(plainText.utf8))
-
-            let finalBytes = iv + cipher
-            return Data(finalBytes).base64EncodedString()
-
+            return Data(iv + cipher).base64EncodedString()
         } catch {
             print("AES encrypt failed:", error)
             return ""

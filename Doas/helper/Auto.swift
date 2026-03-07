@@ -205,6 +205,167 @@ final class Auto {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         vc.present(alert, animated: true)
     }
+    // MARK: - RENDER ABSENSI (Statuses)
+    // Setara fun Statuses.renderAbsensi() di Android
+    static func renderAbsensi(
+        vc: Statuses,
+        obj: [String: Any],
+        aesKey: String,
+        batpul: String?,
+        jamserver: String?
+    ) {
+        func dec(_ field: String) -> String {
+            let v = obj[field] as? String ?? ""
+            guard !v.isEmpty, v != "null" else { return "" }
+            return CryptoAES.decrypt(v, aesKey)
+        }
+
+        let tanggal     = dec("tanggal")
+        let nip         = dec("nip")
+        let masuk       = dec("masuk")
+        let pulang      = dec("pulang")
+        let ket         = dec("keterangan").uppercased()
+        let lat         = dec("latitude")
+        let lng         = dec("longitude")
+        let ketam       = dec("ketam")
+        let pangkat     = dec("pangkat")
+        let foto        = dec("foto")
+        let foto2       = dec("foto2")
+        let fotopulang  = dec("fotopulang")
+        let fotopulang2 = dec("fotopulang2")
+        let latpulang   = dec("latpulang")
+        let lonpulang   = dec("lonpulang")
+        let statuspulang = dec("statuspulang")
+        let ketpul      = dec("ketpul")
+        let subdit      = dec("subdit")
+        let jabatan     = dec("jabatan")
+        let statusmasuk = dec("statusmasuk")
+        let nama        = dec("nama")
+
+        DispatchQueue.main.async {
+            resetView(vc: vc)
+
+            vc.cardStatusHariIni.isHidden = false
+            vc.tvTanggal.text = tanggal
+            vc.tvKet.text     = ket == "DL" ? "Dinas Luar" : ket
+            vc.tvJam.text     = "\(masuk) (\(statusmasuk))"
+            vc.tvKetam.text   = ketam
+            vc.tvKetam.isHidden   = false
+            vc.tvLabelKR.isHidden = false
+
+            // Lokasi masuk
+            if !lat.isEmpty && !lng.isEmpty {
+                vc.tvLat.isHidden    = false
+                vc.tvLat.text        = "Latitude: \(lat) | Longitude: \(lng)"
+                vc.tvAlamat.isHidden = false
+                vc.tvAlamat.text     = "Mencari alamat..."
+                Auto.getAddressFromLatLng(lat: Double(lat) ?? 0, lon: Double(lng) ?? 0) { alamat in
+                    vc.tvAlamat.text = alamat
+                }
+            }
+
+            // Foto masuk
+            if !foto.isEmpty {
+                vc.imgFoto.isHidden = false
+                Auto.loadingFoto(imageView: vc.imgFoto, file: foto, tanggal: tanggal, from: vc)
+            }
+            if !foto2.isEmpty {
+                vc.imgFoto2.isHidden = false
+                Auto.loadingFoto(imageView: vc.imgFoto2, file: foto2, tanggal: tanggal, from: vc)
+            }
+
+            // Subdit
+            if !subdit.isEmpty {
+                vc.tvSubdit.isHidden = false
+                vc.tvSubdit.text = "Nama : \(nama)\nSubdit : \(subdit)\nNIP : \(nip)\nJabatan : \(jabatan)\nPangkat : \(pangkat)"
+            }
+
+            // Pulang
+            if !pulang.isEmpty {
+                vc.tvPulang.text      = "\(pulang) (\(statuspulang))"
+                vc.tvPulang.isHidden  = false
+                vc.tvLabelR.isHidden  = false
+                vc.btnPulang.isHidden = true
+
+                if !fotopulang.isEmpty {
+                    vc.layoutThumbPulang.isHidden = false
+                    vc.imgFotoPulang.isHidden = false
+                    Auto.loadingFoto(imageView: vc.imgFotoPulang, file: fotopulang, tanggal: tanggal, from: vc)
+                }
+                if !fotopulang2.isEmpty {
+                    vc.layoutThumbPulang.isHidden = false
+                    vc.imgFotoPulang2.isHidden = false
+                    Auto.loadingFoto(imageView: vc.imgFotoPulang2, file: fotopulang2, tanggal: tanggal, from: vc)
+                }
+                if !latpulang.isEmpty && !lonpulang.isEmpty {
+                    vc.tvLatPulang.isHidden    = false
+                    vc.tvLatPulang.text        = "Latitude: \(latpulang) | Longitude: \(lonpulang)"
+                    vc.tvAlamatPulang.isHidden = false
+                    vc.tvAlamatPulang.text     = "Mencari alamat..."
+                    Auto.getAddressFromLatLng(lat: Double(latpulang) ?? 0, lon: Double(lonpulang) ?? 0) { alamat in
+                        vc.tvAlamatPulang.text = alamat
+                    }
+                }
+                vc.tvKepul.isHidden    = false
+                vc.tvKepul.text        = ketpul
+                vc.tvLabelKRP.isHidden = false
+
+            } else {
+                // Belum pulang
+                vc.tvLabelR.isHidden      = true
+                vc.tvLabelKRP.isHidden    = true
+                vc.tvKepul.isHidden       = true
+                vc.tvLatPulang.isHidden   = true
+                vc.tvAlamatPulang.isHidden = true
+                vc.imgFotoPulang.isHidden  = true
+                vc.imgFotoPulang2.isHidden = true
+                vc.btnPulang.isHidden      = false
+                vc.tvPulang.isHidden       = false
+                vc.tvPulang.text           = "Belum Absen"
+            }
+
+            // Tombol pulang
+            vc.btnPulang.removeTarget(nil, action: nil, for: .allEvents)
+            vc.onTapBtnPulang = {
+                guard let bp = batpul, !bp.isEmpty else {
+                    Auto.showAlert(vc: vc, message: "Gagal Ambil Data")
+                    return
+                }
+                let next = AbsenHadir()
+                next.bataspulang = bp
+                next.dari = "PULANG"
+                next.jamserver   = jamserver ?? ""
+                next.ket         = ket
+                next.modalPresentationStyle = .fullScreen
+                vc.present(next, animated: true)
+            }
+            vc.btnPulang.addTarget(vc, action: #selector(Statuses.didTapBtnPulang), for: .touchUpInside)
+        }
+    }
+
+    // MARK: - RESET VIEW (Statuses)
+    // Setara fun resetView() di Android
+    static func resetView(vc: Statuses) {
+        vc.tvLat.isHidden             = true
+        vc.tvLabelR.isHidden          = true
+        vc.tvLabelKR.isHidden         = true
+        vc.tvKetam.isHidden           = true
+        vc.tvPulang.isHidden          = true
+        vc.layoutThumbPulang.isHidden = true
+        vc.tvLatPulang.isHidden       = true
+        vc.imgFoto.isHidden           = true
+        vc.imgFoto2.isHidden          = true
+        vc.btnPulang.isHidden         = true
+        vc.tvSubdit.isHidden          = true
+        vc.tvKepul.isHidden           = true
+        vc.cardStatusHariIni.isHidden = true
+        vc.imgFotoPulang.isHidden     = true
+        vc.imgFotoPulang2.isHidden    = true
+        vc.tvAlamat.isHidden          = true
+        vc.tvAlamatPulang.isHidden    = true
+        vc.tvLabelKRP.isHidden        = true
+    }
+
 }
 
 
