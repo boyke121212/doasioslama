@@ -459,6 +459,9 @@ final class Home: Boyke, UIScrollViewDelegate {
         chartTitle.text = "Grafik Subdit"
         chartTitle.font = UIFont.boldSystemFont(ofSize: 14)
         
+        // Insert chartTitle BEFORE lineChartView
+        stack.addArrangedSubview(chartTitle)
+        
         lineChartView.translatesAutoresizingMaskIntoConstraints = false
         lineChartView.heightAnchor.constraint(equalToConstant: 220).isActive = true
 
@@ -479,13 +482,36 @@ final class Home: Boyke, UIScrollViewDelegate {
         stack.addArrangedSubview(tvBulanAwal)
         stack.addArrangedSubview(summaryTitle)
         stack.addArrangedSubview(summaryContainer)
-        stack.addArrangedSubview(chartTitle)
-        stack.addArrangedSubview(chartPlaceholder)
+        
+        // Add label "5 user terakhir" before userContainer
+        let lastUsersTitle = UILabel()
+        lastUsersTitle.text = "5 user terakhir"
+        lastUsersTitle.font = UIFont.boldSystemFont(ofSize: 14)
+        stack.addArrangedSubview(lastUsersTitle)
+        // Card wrapper untuk userContainer
+        let userCard = UIView()
+        userCard.backgroundColor = UIColor.systemGray6
+        userCard.layer.cornerRadius = 12
+        userCard.layer.borderWidth = 1
+        userCard.layer.borderColor = UIColor.separator.cgColor
+        userCard.translatesAutoresizingMaskIntoConstraints = false
+
         userContainer.axis = .vertical
         userContainer.spacing = 8
         userContainer.alignment = .fill
         userContainer.distribution = .fill
-        stack.addArrangedSubview(userContainer)
+        userContainer.translatesAutoresizingMaskIntoConstraints = false
+
+        userCard.addSubview(userContainer)
+
+        NSLayoutConstraint.activate([
+            userContainer.topAnchor.constraint(equalTo: userCard.topAnchor, constant: 12),
+            userContainer.bottomAnchor.constraint(equalTo: userCard.bottomAnchor, constant: -12),
+            userContainer.leadingAnchor.constraint(equalTo: userCard.leadingAnchor, constant: 12),
+            userContainer.trailingAnchor.constraint(equalTo: userCard.trailingAnchor, constant: -12)
+        ])
+
+        stack.addArrangedSubview(userCard)
     }
     
     // MARK: - Collapsing Header
@@ -625,6 +651,33 @@ final class Home: Boyke, UIScrollViewDelegate {
         leftAxis.valueFormatter = DefaultAxisValueFormatter(formatter: formatter)
     }
     
+    private func colorFromHex(_ hex: String) -> UIColor? {
+        var cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if cleaned.hasPrefix("#") { cleaned.removeFirst() }
+        var alpha: CGFloat = 1.0
+        var rgb: UInt64 = 0
+        guard Scanner(string: cleaned).scanHexInt64(&rgb) else { return nil }
+        switch cleaned.count {
+        case 6:
+            return UIColor(
+                red: CGFloat((rgb & 0xFF0000) >> 16) / 255.0,
+                green: CGFloat((rgb & 0x00FF00) >> 8) / 255.0,
+                blue: CGFloat(rgb & 0x0000FF) / 255.0,
+                alpha: alpha
+            )
+        case 8:
+            alpha = CGFloat((rgb & 0xFF000000) >> 24) / 255.0
+            return UIColor(
+                red: CGFloat((rgb & 0x00FF0000) >> 16) / 255.0,
+                green: CGFloat((rgb & 0x0000FF00) >> 8) / 255.0,
+                blue: CGFloat(rgb & 0x000000FF) / 255.0,
+                alpha: alpha
+            )
+        default:
+            return nil
+        }
+    }
+    
     private func configureGridButton(_ button: UIButton, title: String) {
 
         button.setTitle(title, for: .normal)
@@ -646,207 +699,146 @@ final class Home: Boyke, UIScrollViewDelegate {
   
     
     private func renderChartFromRawJSON() {
-
-        guard
-            let json = rawDashboardJSON,
-            let dashboard = json["dashboard"] as? [String: Any],
-            let dataMap = dashboard["dataMap"] as? [String: Any]
-        else {
+        guard let json = rawDashboardJSON,
+              let dashboard = json["dashboard"] as? [String: Any] else {
             lineChartView.clear()
             return
         }
+        
+        // Extract keys from dashboard
+        let grafikSubdit = dashboard["grafikSubdit"] as? [String: [String: Any]] ?? [:]
+        let warnaSubdit = dashboard["warnaSubdit"] as? [String: String] ?? [:]
+        let subditList = dashboard["subditList"] as? [String] ?? []
+        let bulanUrut = dashboard["bulanUrut"] as? [String: String] ?? [:]
+        let bulanAwalRaw = dashboard["bulanAwal"]
+        let bulanAwal: Int
+        if let ba = bulanAwalRaw as? Int {
+            bulanAwal = ba
+        } else if let baStr = bulanAwalRaw as? String, let baInt = Int(baStr) {
+            bulanAwal = baInt
+        } else {
+            bulanAwal = 1
+        }
 
-        var dataSets: [LineChartDataSet] = []
-        var globalMaxY: Double = 0
-
-        let colors: [UIColor] = [
-            UIColor.blue,      // Color.BLUE
-            UIColor.red,       // Color.RED
-            UIColor.green,     // Color.GREEN
-            UIColor.magenta,   // Color.MAGENTA
-            UIColor.cyan       // Color.CYAN
-        ]
-
-        var colorIndex = 0
-
-        // LOOP SUBDIT
-        for (subdit, monthsValue) in dataMap {
-
-            guard let months = monthsValue as? [String: Any] else { continue }
-
-            var entries: [ChartDataEntry] = []
-
-            // LOOP BULAN
-            for (bulanStr, detailValue) in months {
-
-                guard
-                    let xValue = Double(bulanStr),
-                    let detail = detailValue as? [String: Any],
-                    let terserapStr = detail["anggaran_terserap"] as? String,
-                    let terserap = Double(terserapStr)
-                else { continue }
-
-                entries.append(
-                    ChartDataEntry(
-                        x: xValue,
-                        y: terserap
-                    )
-                )
-
-                if terserap > globalMaxY {
-                    globalMaxY = terserap
+        // Build monthKeys and labels
+        var monthKeys: [String] = []
+        var labels: [String] = []
+        if !bulanUrut.isEmpty {
+            let sortedKeys = bulanUrut.keys.compactMap { Int($0) }.sorted()
+            for keyInt in sortedKeys {
+                let keyStr = String(keyInt)
+                monthKeys.append(keyStr)
+                if let label = bulanUrut[keyStr] {
+                    labels.append(label)
+                } else {
+                    labels.append(keyStr)
                 }
             }
+        } else {
+            // fallback
+            let monthNames = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"]
+            for i in 0..<12 {
+                let monthNumber = ((bulanAwal - 1 + i) % 12) + 1
+                monthKeys.append(String(monthNumber))
+                labels.append(monthNames[(monthNumber - 1) % 12])
+            }
+        }
 
-            entries.sort { $0.x < $1.x }
+        // Determine orderedSubdits
+        let orderedSubdits: [String]
+        if !subditList.isEmpty {
+            orderedSubdits = subditList
+        } else {
+            orderedSubdits = grafikSubdit.keys.sorted()
+        }
 
-            if !entries.isEmpty {
+        // Default color palette
+        let defaultColors: [UIColor] = [.blue, .red, .green, .magenta, .cyan, UIColor(red: 1, green: 0.596, blue: 0, alpha: 1)]
 
-                let dataSet = LineChartDataSet(
-                    entries: entries,
-                    label: subdit
-                )
+        var dataSets: [LineChartDataSet] = []
 
-                let color = colors[colorIndex % colors.count]
+        for (i, subdit) in orderedSubdits.enumerated() {
+            var entries: [ChartDataEntry] = []
 
+            for (index, monthKey) in monthKeys.enumerated() {
+                let rawValue = grafikSubdit[subdit]?[monthKey]
+
+                var yValue: Double = 0
+                if let val = rawValue as? Double {
+                    yValue = val
+                } else if let val = rawValue as? NSNumber {
+                    yValue = val.doubleValue
+                } else if let valStr = rawValue as? String {
+                    yValue = Double(valStr) ?? 0
+                }
+
+                entries.append(ChartDataEntry(x: Double(index), y: yValue))
+            }
+
+            let dataSet = LineChartDataSet(entries: entries, label: subdit)
+
+            // Set colors
+            if let hexColor = warnaSubdit[subdit], let color = colorFromHex(hexColor) {
                 dataSet.colors = [color]
                 dataSet.circleColors = [color]
-                dataSet.lineWidth = 2
-                dataSet.circleRadius = 4
-                dataSet.drawValuesEnabled = false
-                dataSet.mode = .linear
-
-                dataSets.append(dataSet)
-                colorIndex += 1
+            } else {
+                let color = defaultColors[i % defaultColors.count]
+                dataSet.colors = [color]
+                dataSet.circleColors = [color]
             }
+
+            dataSet.lineWidth = 2.5
+            dataSet.circleRadius = 3.5
+            dataSet.drawValuesEnabled = false
+            dataSet.mode = .linear
+
+            dataSets.append(dataSet)
         }
 
         let lineData = LineChartData(dataSets: dataSets)
         lineChartView.data = lineData
 
-        // Build custom legend (ordered rows, left-aligned)
-        lineChartView.legend.enabled = false
+        // Configure axes
+        let leftAxis = lineChartView.leftAxis
+        leftAxis.axisMinimum = 0
+        leftAxis.axisMaximum = 100
+        leftAxis.granularity = 20
+        leftAxis.labelCount = 6
+        leftAxis.forceLabelsEnabled = false
 
-        // Clear old legend rows
-        customLegend.arrangedSubviews.forEach { row in
-            customLegend.removeArrangedSubview(row)
-            row.removeFromSuperview()
-        }
+        let percentFormatter = NumberFormatter()
+        percentFormatter.numberStyle = .percent
+        percentFormatter.maximumFractionDigits = 1
+        percentFormatter.multiplier = 1
+        leftAxis.valueFormatter = DefaultAxisValueFormatter(formatter: percentFormatter)
 
-        // Make spacing a bit larger so rows aren't too tight
-        customLegend.spacing = 10
+        let rightAxis = lineChartView.rightAxis
+        rightAxis.enabled = false
 
-        // Helper: create a legend item view
-        func makeLegendItem(color: UIColor, text: String) -> UIView {
-            let dot = UIView()
-            dot.translatesAutoresizingMaskIntoConstraints = false
-            dot.backgroundColor = color
-            dot.layer.cornerRadius = 4
-            NSLayoutConstraint.activate([
-                dot.widthAnchor.constraint(equalToConstant: 8),
-                dot.heightAnchor.constraint(equalToConstant: 8)
-            ])
+        // Configure xAxis
+        let xAxis = lineChartView.xAxis
+        xAxis.labelPosition = .bottom
+        xAxis.granularity = 1
+        xAxis.axisMinimum = -0.5
+        xAxis.axisMaximum = Double(labels.count) - 0.5
+        xAxis.labelCount = labels.count
+        xAxis.drawGridLinesEnabled = true
+        xAxis.valueFormatter = IndexAxisValueFormatter(values: labels)
 
-            let label = UILabel()
-            label.font = UIFont.systemFont(ofSize: 11)
-            label.textColor = .darkGray
-            label.text = text
+        // Configure legend
+        let legend = lineChartView.legend
+        legend.enabled = true
+        legend.wordWrapEnabled = true
+        legend.verticalAlignment = .bottom
+        legend.horizontalAlignment = .center
+        legend.orientation = .horizontal
+        legend.drawInside = false
+        legend.yOffset = 5
 
-            let h = UIStackView(arrangedSubviews: [dot, label])
-            h.axis = .horizontal
-            h.alignment = .center
-            h.spacing = 6
-            return h
-        }
-
-        // Map dataset by label for quick lookup
-        var dataSetByLabel: [String: LineChartDataSet] = [:]
-        for set in dataSets {
-            if let label = set.label { dataSetByLabel[label] = set }
-        }
-
-        // Desired ordering per row
-        let row1Labels = ["Subdit 1", "Subdit 2", "Subdit 3", "Subdit 4", "Subdit 5"]
-        let row2Labels = ["Subdit Staff", "Pimpinan"]
-
-        func makeRow(with labels: [String]) -> UIStackView {
-            let row = UIStackView()
-            row.axis = .horizontal
-            row.alignment = .center
-            row.spacing = 12
-            row.distribution = .fill
-            for label in labels {
-                if let set = dataSetByLabel[label] {
-                    let color = set.colors.first ?? .label
-                    let item = makeLegendItem(color: color, text: label)
-                    row.addArrangedSubview(item)
-                }
-            }
-            return row
-        }
-
-        // Add rows to customLegend
-        let row1 = makeRow(with: row1Labels)
-        let row2 = makeRow(with: row2Labels)
-        customLegend.addArrangedSubview(row1)
-        customLegend.addArrangedSubview(row2)
-
-        // If there are any remaining datasets not covered by the two rows, add them as a third row (optional fallback)
-        let covered = Set(row1Labels + row2Labels)
-        let remaining = dataSets.compactMap { $0.label }.filter { !covered.contains($0) }
-        if !remaining.isEmpty {
-            let row3 = UIStackView()
-            row3.axis = .horizontal
-            row3.alignment = .center
-            row3.spacing = 12
-            row3.distribution = .fill
-            for label in remaining {
-                if let set = dataSetByLabel[label] {
-                    let color = set.colors.first ?? .label
-                    let item = makeLegendItem(color: color, text: label)
-                    row3.addArrangedSubview(item)
-                }
-            }
-            customLegend.addArrangedSubview(row3)
-        }
-
-        // AUTO SCALE
-        lineChartView.leftAxis.axisMinimum = 0
-        lineChartView.leftAxis.axisMaximum = globalMaxY * 1.2
-        lineChartView.leftAxis.labelCount = 5
-        lineChartView.leftAxis.forceLabelsEnabled = false
-
-        // BULAN
-        lineChartView.xAxis.labelPosition = .top
-        lineChartView.xAxis.granularity = 1
-        lineChartView.xAxis.axisMinimum = 1
-        lineChartView.xAxis.axisMaximum = 12
-        lineChartView.xAxis.valueFormatter = MonthValueFormatter()
-        lineChartView.xAxis.drawGridLinesEnabled = true
-
-        // ===== LEGEND =====
-//        let legend = lineChartView.legend
-//        legend.enabled = true
-
-//        legend.verticalAlignment = .bottom
-//        legend.horizontalAlignment = .right   // mentok kanan
-//        legend.orientation = .horizontal      // 🔥 horizontal
-
-//        legend.drawInside = false
-//        legend.wordWrapEnabled = true
-
-//        legend.form = .circle
-//        legend.formSize = 8
-
-//        legend.xEntrySpace = 6
-//        legend.yEntrySpace = 3
-
-//        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
-//        legend.maxSizePercent = 1.0
-
-        lineChartView.extraBottomOffset = 20
-        // STYLE
-        lineChartView.rightAxis.enabled = false
+        // Misc
+        lineChartView.extraBottomOffset = 10
+        lineChartView.setScaleEnabled(true)
+        lineChartView.pinchZoomEnabled = true
 
         lineChartView.animate(xAxisDuration: 1.0)
         lineChartView.notifyDataSetChanged()
@@ -1034,7 +1026,6 @@ final class SummaryRowView: UIView {
         }
     }
 }
-
 final class UserRowView: UIView {
 
     private let nameLabel = UILabel()
@@ -1083,7 +1074,6 @@ final class UserRowView: UIView {
         detailLabel.text = "\(user.pangkat) | \(user.jabatan) | \(user.subdit)"
         dateLabel.text = user.createdDtm
     }
-    
 }
 
 
@@ -1237,5 +1227,4 @@ class MonthValueFormatter: AxisValueFormatter {
         return String(Int(value))
     }
 }
-
 
