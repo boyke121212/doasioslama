@@ -232,6 +232,7 @@ class BeritaDetailActivity: UIViewController {
                documentAttributes: nil
            ) {
             tvDetailIsi.attributedText = attributed
+            applyJustify(to: tvDetailIsi)
         } else {
             tvDetailIsi.text = ""
         }
@@ -254,6 +255,7 @@ class BeritaDetailActivity: UIViewController {
                documentAttributes: nil
            ) {
             tvDetailIsi.attributedText = attributed
+            applyJustify(to: tvDetailIsi)
         } else {
             tvDetailIsi.text = beritaIsi
         }
@@ -282,6 +284,20 @@ class BeritaDetailActivity: UIViewController {
         let urlPdf = AppConfig.BASE_URL + "api/media/pdf/" + beritaPdf
         PdfDownloader.download(url: urlPdf, filename: beritaPdf, token: token, from: self)
     }
+
+    // MARK: - Helper to apply justified alignment to UITextView attributedText
+    private func applyJustify(to textView: UITextView) {
+        guard let attributedText = textView.attributedText, attributedText.length > 0 else { return }
+        let mutableAttributed = NSMutableAttributedString(attributedString: attributedText)
+        let fullRange = NSRange(location: 0, length: mutableAttributed.length)
+
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .justified
+
+        // Apply paragraph style to entire text
+        mutableAttributed.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
+        textView.attributedText = mutableAttributed
+    }
 }
 
 // MARK: - Collapsing toolbar saat scroll
@@ -308,3 +324,4 @@ extension BeritaDetailActivity: UIScrollViewDelegate {
             : UIColor.black.withAlphaComponent(0.35)
     }
 }
+

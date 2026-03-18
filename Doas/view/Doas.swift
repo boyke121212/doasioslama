@@ -660,9 +660,30 @@ class Doas: Boyke,UIScrollViewDelegate {
             let attributedString = try NSMutableAttributedString(data: data, options: options, documentAttributes: nil)
             // Removed setting the font for entire string to preserve HTML formatting
             textView.attributedText = attributedString
+            if textView == tvDoas {
+                applyJustify(to: textView)
+            }
         } catch {
             textView.text = html
         }
+    }
+    
+    // MARK: - Helper to apply justified alignment on UITextView's attributedText
+    func applyJustify(to textView: UITextView) {
+        guard let attributedText = textView.attributedText else { return }
+        let mutableAttributedText = NSMutableAttributedString(attributedString: attributedText)
+        let fullRange = NSRange(location: 0, length: mutableAttributedText.length)
+        
+        // Enumerate through paragraphs and set paragraph style alignment to justified
+        mutableAttributedText.enumerateAttribute(.paragraphStyle, in: fullRange, options: []) { (value, range, _) in
+            let paragraphStyle = (value as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+            let newParagraphStyle = NSMutableParagraphStyle()
+            newParagraphStyle.setParagraphStyle(paragraphStyle)
+            newParagraphStyle.alignment = .justified
+            mutableAttributedText.addAttribute(.paragraphStyle, value: newParagraphStyle, range: range)
+        }
+        
+        textView.attributedText = mutableAttributedText
     }
 }
 
