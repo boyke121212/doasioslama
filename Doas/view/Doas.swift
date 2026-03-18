@@ -23,7 +23,7 @@ class Doas: Boyke,UIScrollViewDelegate {
 
     let tvAtas = UILabel()
     let scrollText = UIScrollView()
-    let tvDoas = UILabel()
+    let tvDoas = UITextView()
 
     let btDownload = UIButton(type: .system)
     private var bannerSlider: BannerSlider!
@@ -140,7 +140,7 @@ class Doas: Boyke,UIScrollViewDelegate {
                     let pdf   = CryptoAES.decrypt(json["pdf"]   as? String ?? "", aesKey)
 
                     self.tvAtas.text = judul
-                    self.tvDoas.text = isi.htmlPreviewClean(maxWords: 2000)
+                    self.setHTML(isi, to: self.tvDoas)
 
                     // MARK: DOWNLOAD PDF
                     self.btDownload.addAction(UIAction { _ in
@@ -228,12 +228,12 @@ class Doas: Boyke,UIScrollViewDelegate {
         tvDoas.translatesAutoresizingMaskIntoConstraints = false
         tvDoas.font = UIFont.systemFont(ofSize: 14)
         tvDoas.textColor = .black
-        tvDoas.numberOfLines = 0
-        tvDoas.text = """
-        isi
-        isi
-        isi
-        """
+        tvDoas.isEditable = false
+        tvDoas.isScrollEnabled = false
+        tvDoas.backgroundColor = .clear
+        // Default placeholder content as attributed string
+        let defaultHTML = "<p>isi<br>isi<br>isi</p>"
+        setHTML(defaultHTML, to: tvDoas)
 
         btDownload.translatesAutoresizingMaskIntoConstraints = false
         btDownload.setTitle("Download PDF", for: .normal)
@@ -643,6 +643,25 @@ class Doas: Boyke,UIScrollViewDelegate {
             }) { _ in
                 toast.removeFromSuperview()
             }
+        }
+    }
+
+    // MARK: - Helper to set HTML string to UITextView safely
+    private func setHTML(_ html: String, to textView: UITextView) {
+        guard let data = html.data(using: .utf8) else {
+            textView.text = html
+            return
+        }
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue
+        ]
+        do {
+            let attributedString = try NSMutableAttributedString(data: data, options: options, documentAttributes: nil)
+            // Removed setting the font for entire string to preserve HTML formatting
+            textView.attributedText = attributedString
+        } catch {
+            textView.text = html
         }
     }
 }

@@ -75,7 +75,7 @@ final class AuthManager {
               !accessToken.isEmpty,
               !refreshToken.isEmpty else {
 
-            onLogout("Sesi tidak valid")
+            //onLogout("Sesi tidak valid")
             self.forceLogout(message: " dari access kosong Anda telah Logout")
             return
         }
@@ -222,7 +222,8 @@ final class AuthManager {
         guard let accessToken = securePrefs.getAccessToken(),
               !accessToken.isEmpty else {
 
-            onLogout("Sesi tidak valid")
+            //onLogout("Sesi tidak valid")
+            self.forceLogout(message: "Sesi Tidak Valid")
             return
         }
 
@@ -411,8 +412,8 @@ final class AuthManager {
                     let newRefresh = json["refresh_token"] as? String ?? ""
 
                     if newAccess.isEmpty || newRefresh.isEmpty {
-
-                        onLogout(message)
+                        self.forceLogout(message: "Anda Harus Login Ulang")
+                      //  onLogout(message)
                         return
                     }
 

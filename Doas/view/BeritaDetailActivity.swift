@@ -39,11 +39,11 @@ class BeritaDetailActivity: UIViewController {
     private let btnBack        = UIButton(type: .system)
 
     // Content (setara LinearLayout padding="20dp")
-    private let tvDetailJudul  = UILabel()
+    private let tvDetailJudul   = UILabel()
     private let tvDetailTanggal = UILabel()
-    private let divider        = UIView()
-    private let tvDetailIsi    = UILabel()
-    private let btnDownloadPdf = UIButton(type: .system)
+    private let divider         = UIView()
+    private let tvDetailIsi     = UITextView()
+    private let btnDownloadPdf  = UIButton(type: .system)
 
     // MARK: - viewDidLoad
     override func viewDidLoad() {
@@ -194,16 +194,14 @@ class BeritaDetailActivity: UIViewController {
         ])
         stack.setCustomSpacing(20, after: divider)
 
-        // tvDetailIsi — textSize="16sp" lineSpacingExtra="6sp"
-        tvDetailIsi.font          = .systemFont(ofSize: 16)
-        tvDetailIsi.textColor     = UIColor(hex: "#333333")
-        tvDetailIsi.numberOfLines = 0
-        let paragraphStyle             = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing     = 6
-        tvDetailIsi.attributedText     = NSAttributedString(
-            string: "",
-            attributes: [.paragraphStyle: paragraphStyle]
-        )
+        // tvDetailIsi — replaced UILabel with UITextView for HTML rendering
+        tvDetailIsi.font = .systemFont(ofSize: 16)
+        tvDetailIsi.textColor = UIColor(hex: "#333333")
+        tvDetailIsi.isEditable = false
+        tvDetailIsi.isScrollEnabled = false
+        tvDetailIsi.backgroundColor = .clear
+        tvDetailIsi.textContainerInset = .zero
+        tvDetailIsi.textContainer.lineFragmentPadding = 0
         stack.addArrangedSubview(tvDetailIsi)
         stack.setCustomSpacing(32, after: tvDetailIsi)
 
@@ -221,6 +219,22 @@ class BeritaDetailActivity: UIViewController {
             btnDownloadPdf.heightAnchor.constraint(equalToConstant: 56)
         ])
         stack.setCustomSpacing(32, after: btnDownloadPdf)
+
+        // Initial placeholder for tvDetailIsi (empty attributed string with paragraph style)
+        let placeholderHtml = ""
+        if let data = placeholderHtml.data(using: .utf8),
+           let attributed = try? NSAttributedString(
+               data: data,
+               options: [
+                   .documentType: NSAttributedString.DocumentType.html,
+                   .characterEncoding: String.Encoding.utf8.rawValue
+               ],
+               documentAttributes: nil
+           ) {
+            tvDetailIsi.attributedText = attributed
+        } else {
+            tvDetailIsi.text = ""
+        }
     }
 
     // MARK: - Bind data (setara onCreate intent.getStringExtra)
@@ -239,16 +253,7 @@ class BeritaDetailActivity: UIViewController {
                ],
                documentAttributes: nil
            ) {
-            let mutable = NSMutableAttributedString(attributedString: attributed)
-            let fullRange = NSRange(location: 0, length: mutable.length)
-            mutable.addAttributes([
-                .font: UIFont.systemFont(ofSize: 16),
-                .foregroundColor: UIColor(hex: "#333333")
-            ], range: fullRange)
-            let paraStyle          = NSMutableParagraphStyle()
-            paraStyle.lineSpacing  = 6
-            mutable.addAttribute(.paragraphStyle, value: paraStyle, range: fullRange)
-            tvDetailIsi.attributedText = mutable
+            tvDetailIsi.attributedText = attributed
         } else {
             tvDetailIsi.text = beritaIsi
         }
