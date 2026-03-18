@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import WebKit
 
 // MARK: - BeritaDetailActivity
 // Porting dari: BeritaDetailActivity.kt + activity_berita_detail.xml
@@ -42,7 +43,25 @@ class BeritaDetailActivity: UIViewController {
     private let tvDetailJudul   = UILabel()
     private let tvDetailTanggal = UILabel()
     private let divider         = UIView()
-    private let tvDetailIsi     = UITextView()
+    // webView — render HTML content like Android WebView
+    private lazy var webView: WKWebView = {
+        let config = WKWebViewConfiguration()
+        // JavaScript enabled (default true, but explicit for clarity)
+        config.preferences.javaScriptEnabled = true
+        config.allowsInlineMediaPlayback = true
+        if #available(iOS 16.4, *) {
+            config.defaultWebpagePreferences.allowsContentJavaScript = true
+        }
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.isOpaque = false
+        wv.backgroundColor = .clear
+        // Mirroring Android: allow pinch zoom via viewport; enable internal scroll so webView scrolls itself
+        wv.scrollView.isScrollEnabled = true
+        wv.scrollView.bounces = true
+        wv.allowsBackForwardNavigationGestures = false
+        if #available(iOS 16.0, *) { wv.isInspectable = false }
+        return wv
+    }()
     private let btnDownloadPdf  = UIButton(type: .system)
 
     // MARK: - viewDidLoad
@@ -53,6 +72,7 @@ class BeritaDetailActivity: UIViewController {
         setupHero()
         setupBackButton()
         setupContent()
+        webView.navigationDelegate = self
         bindData()
     }
 
@@ -194,16 +214,11 @@ class BeritaDetailActivity: UIViewController {
         ])
         stack.setCustomSpacing(20, after: divider)
 
-        // tvDetailIsi — replaced UILabel with UITextView for HTML rendering
-        tvDetailIsi.font = .systemFont(ofSize: 16)
-        tvDetailIsi.textColor = UIColor(hex: "#333333")
-        tvDetailIsi.isEditable = false
-        tvDetailIsi.isScrollEnabled = false
-        tvDetailIsi.backgroundColor = .clear
-        tvDetailIsi.textContainerInset = .zero
-        tvDetailIsi.textContainer.lineFragmentPadding = 0
-        stack.addArrangedSubview(tvDetailIsi)
-        stack.setCustomSpacing(32, after: tvDetailIsi)
+        // webView — render HTML content like Android WebView
+        stack.addArrangedSubview(webView)
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor).isActive = true
+        stack.setCustomSpacing(32, after: webView)
 
         // btnDownloadPdf — height="56dp" cornerRadius="12dp" visibility="gone" default
         btnDownloadPdf.setTitle("Download Lampiran PDF", for: .normal)
@@ -219,23 +234,6 @@ class BeritaDetailActivity: UIViewController {
             btnDownloadPdf.heightAnchor.constraint(equalToConstant: 56)
         ])
         stack.setCustomSpacing(32, after: btnDownloadPdf)
-
-        // Initial placeholder for tvDetailIsi (empty attributed string with paragraph style)
-        let placeholderHtml = ""
-        if let data = placeholderHtml.data(using: .utf8),
-           let attributed = try? NSAttributedString(
-               data: data,
-               options: [
-                   .documentType: NSAttributedString.DocumentType.html,
-                   .characterEncoding: String.Encoding.utf8.rawValue
-               ],
-               documentAttributes: nil
-           ) {
-            tvDetailIsi.attributedText = attributed
-            applyJustify(to: tvDetailIsi)
-        } else {
-            tvDetailIsi.text = ""
-        }
     }
 
     // MARK: - Bind data (setara onCreate intent.getStringExtra)
@@ -244,21 +242,40 @@ class BeritaDetailActivity: UIViewController {
         tvDetailJudul.text   = beritaJudul
         tvDetailTanggal.text = beritaTanggal
 
-        // Html.fromHtml(isi) — iOS pakai NSAttributedString dengan html documentType
-        if let data = beritaIsi.data(using: .utf8),
-           let attributed = try? NSAttributedString(
-               data: data,
-               options: [
-                   .documentType: NSAttributedString.DocumentType.html,
-                   .characterEncoding: String.Encoding.utf8.rawValue
-               ],
-               documentAttributes: nil
-           ) {
-            tvDetailIsi.attributedText = attributed
-            applyJustify(to: tvDetailIsi)
-        } else {
-            tvDetailIsi.text = beritaIsi
-        }
+        // Render HTML using WKWebView (like Android WebView)
+        let baseURLString = AppConfig.BASE_URL
+        let normalizedBase: String = baseURLString.hasSuffix("/") ? baseURLString : baseURLString + "/"
+        let htmlHead = """
+        <!doctype html>
+        <html>
+        <head>
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=yes\">
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 16px; line-height: 1.6; color: #333333;
+            margin: 0; padding: 0;
+          }
+          .container { padding: 0 20px 0 20px; }
+          p { text-align: justify; }
+          img { max-width: 100%; height: auto; display: block; margin: 10px 0; }
+          iframe { max-width: 100%; }
+        </style>
+        </head>
+        <body>
+        <div class=\"container\">
+        """
+        let htmlTail = """
+        </div>
+        </body>
+        </html>
+        """
+        let htmlBody = beritaIsi
+        let fullHTML = htmlHead + htmlBody + htmlTail
+        webView.loadHTMLString(fullHTML, baseURL: URL(string: normalizedBase))
+
+        // Note: If images are served over HTTP or require Authorization headers, ATS/mixed-content or auth may block them.
+        // Ensure images are HTTPS and publicly accessible, or preprocess HTML to embed images as data URIs if needed.
 
         // Load foto — setara Coil load dengan header Authorization
         let token  = SecurePrefs().getAccessToken() ?? ""
@@ -283,20 +300,6 @@ class BeritaDetailActivity: UIViewController {
         let token  = SecurePrefs().getAccessToken() ?? ""
         let urlPdf = AppConfig.BASE_URL + "api/media/pdf/" + beritaPdf
         PdfDownloader.download(url: urlPdf, filename: beritaPdf, token: token, from: self)
-    }
-
-    // MARK: - Helper to apply justified alignment to UITextView attributedText
-    private func applyJustify(to textView: UITextView) {
-        guard let attributedText = textView.attributedText, attributedText.length > 0 else { return }
-        let mutableAttributed = NSMutableAttributedString(attributedString: attributedText)
-        let fullRange = NSRange(location: 0, length: mutableAttributed.length)
-
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .justified
-
-        // Apply paragraph style to entire text
-        mutableAttributed.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
-        textView.attributedText = mutableAttributed
     }
 }
 
@@ -325,3 +328,7 @@ extension BeritaDetailActivity: UIScrollViewDelegate {
     }
 }
 
+extension BeritaDetailActivity: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {}
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {}
+}
