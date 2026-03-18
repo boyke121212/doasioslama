@@ -46,11 +46,12 @@ class BeritaDetailActivity: UIViewController {
     // webView — render HTML content like Android WebView
     private lazy var webView: WKWebView = {
         let config = WKWebViewConfiguration()
-        // JavaScript enabled (default true, but explicit for clarity)
-        config.preferences.javaScriptEnabled = true
-        config.allowsInlineMediaPlayback = true
-        if #available(iOS 16.4, *) {
-            config.defaultWebpagePreferences.allowsContentJavaScript = true
+        if #available(iOS 14.0, *) {
+            let preferences = WKWebpagePreferences()
+            preferences.allowsContentJavaScript = true
+            config.defaultWebpagePreferences = preferences
+        } else {
+            config.preferences.javaScriptEnabled = true
         }
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.isOpaque = false
@@ -58,6 +59,8 @@ class BeritaDetailActivity: UIViewController {
         // Mirroring Android: allow pinch zoom via viewport; enable internal scroll so webView scrolls itself
         wv.scrollView.isScrollEnabled = true
         wv.scrollView.bounces = true
+        wv.scrollView.pinchGestureRecognizer?.isEnabled = true
+
         wv.allowsBackForwardNavigationGestures = false
         if #available(iOS 16.0, *) { wv.isInspectable = false }
         return wv
@@ -73,6 +76,13 @@ class BeritaDetailActivity: UIViewController {
         setupBackButton()
         setupContent()
         webView.navigationDelegate = self
+        webView.scrollView.pinchGestureRecognizer?.delegate = self
+        webView.scrollView.delaysContentTouches = false
+        webView.scrollView.canCancelContentTouches = true
+
+        if #available(iOS 11.0, *) {
+            webView.scrollView.contentInsetAdjustmentBehavior = .never
+        }
         bindData()
     }
 
@@ -101,6 +111,7 @@ class BeritaDetailActivity: UIViewController {
             contentView.widthAnchor.constraint(equalTo: fg.widthAnchor)
         ])
     }
+    
 
     // MARK: - Hero (CollapsingToolbarLayout + ImageView + gradient)
     private func setupHero() {
@@ -249,7 +260,7 @@ class BeritaDetailActivity: UIViewController {
         <!doctype html>
         <html>
         <head>
-        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=yes\">
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes\">
         <style>
           body {
             font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;
@@ -265,13 +276,15 @@ class BeritaDetailActivity: UIViewController {
         <body>
         <div class=\"container\">
         """
+
         let htmlTail = """
         </div>
         </body>
         </html>
         """
+
+        let fullHTML = htmlHead + beritaIsi + htmlTail
         let htmlBody = beritaIsi
-        let fullHTML = htmlHead + htmlBody + htmlTail
         webView.loadHTMLString(fullHTML, baseURL: URL(string: normalizedBase))
 
         // Note: If images are served over HTTP or require Authorization headers, ATS/mixed-content or auth may block them.
@@ -325,6 +338,24 @@ extension BeritaDetailActivity: UIScrollViewDelegate {
         btnBack.backgroundColor = progress > 0.7
             ? UIColor(hex: "#2563EB").withAlphaComponent(0.9)
             : UIColor.black.withAlphaComponent(0.35)
+    }
+}
+
+extension BeritaDetailActivity: UIGestureRecognizerDelegate {
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return false
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return false
     }
 }
 
