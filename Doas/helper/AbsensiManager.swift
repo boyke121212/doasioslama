@@ -47,29 +47,42 @@ AVCapturePhotoCaptureDelegate {
 
     // MARK: BIOMETRIC
 
-    func authenticate(onSuccess: @escaping () -> Void) {
-        print("BIOMETRIC BYPASS")
-        onSuccess()
 
-//        let context = LAContext()
-//
-//        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) {
-//
-//            context.evaluatePolicy(
-//                .deviceOwnerAuthenticationWithBiometrics,
-//                localizedReason: "Konfirmasi absensi"
-//            ) { success, _ in
-//
-//                DispatchQueue.main.async {
-//                    if success {
-//                        onSuccess()
-//                    }
-//                }
-//            }
-//
-//        } else {
-//            DispatchQueue.main.async { onSuccess() }
-//        }
+
+    func authenticate(onSuccess: @escaping () -> Void,
+                      onFailure: (() -> Void)? = nil) {
+
+        let context = LAContext()
+        var error: NSError?
+
+        // Cek apakah device support biometrik
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            print("Biometric tidak tersedia / error: \(error?.localizedDescription ?? "unknown")")
+            
+            DispatchQueue.main.async {
+                // BYPASS kalau tidak support
+                onSuccess()
+            }
+            return
+        }
+
+        let reason = "Konfirmasi absensi"
+
+        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
+                               localizedReason: reason) { success, evalError in
+
+            DispatchQueue.main.async {
+
+                if success {
+                    onSuccess()
+                } else {
+                    print("Biometric gagal: \(evalError?.localizedDescription ?? "unknown")")
+                    
+                    // 🔥 INI BAGIAN BYPASS KALAU ERROR / CANCEL
+                    onSuccess()
+                }
+            }
+        }
     }
 
     // MARK: PREPARE

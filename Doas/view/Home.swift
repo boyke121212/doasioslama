@@ -46,6 +46,10 @@ final class Home: Boyke, UIScrollViewDelegate {
     let btSakit = UIButton()
     let btBko = UIButton()
     
+    // MARK: - DOCTOR CARD
+    
+    let doctorCard = UIView()
+    
     // MARK: - DASHBOARD CARD
     
     let dashboardCard = UIView()
@@ -92,7 +96,6 @@ final class Home: Boyke, UIScrollViewDelegate {
         btLog.addTarget(self, action: #selector(ontapLog), for: .touchUpInside)
         self.monitorInternet()
         btProfile.addTarget(self, action: #selector(bukaprofile), for: .touchUpInside)
-
     }
     @objc private func bukaprofile() {
         let vc = ProfileActivity()
@@ -108,10 +111,14 @@ final class Home: Boyke, UIScrollViewDelegate {
     @objc private func ontapLog() {
      openPage(History())
     }
+    
+    @objc private func onTapDokter() {
+        openPage(DoctorListActivity())
+    }
+    
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         refreshData()
-        print("Hero height home: ", heroContainer.frame.height)
 
     }
     
@@ -151,6 +158,7 @@ final class Home: Boyke, UIScrollViewDelegate {
         setupFloatingMenu()
         setupPresensiCard()
         setupGridMenu()
+        setupDoctorCard()      // ⬅️ TAMBAHKAN INI
         setupDashboardCard()
     }
     
@@ -299,13 +307,6 @@ final class Home: Boyke, UIScrollViewDelegate {
         tbMenuStack.addArrangedSubview(btLog)
         tbMenuStack.addArrangedSubview(btProfile)
         tbMenuStack.addArrangedSubview(btDoas)
-        
-//        btAbsen.addTarget(self, action: #selector(onTapAbsen), for: .touchUpInside)
-//        btStatus.addTarget(self, action: #selector(onTapStatus), for: .touchUpInside)
-//        btInfo.addTarget(self, action: #selector(onTapInfo), for: .touchUpInside)
-//        btLog.addTarget(self, action: #selector(onTapLog), for: .touchUpInside)
-//        btProfile.addTarget(self, action: #selector(onTapProfile), for: .touchUpInside)
-//        btDoas.addTarget(self, action: #selector(onTapDoas), for: .touchUpInside)
     }
     
     // =========================================================
@@ -404,6 +405,128 @@ final class Home: Boyke, UIScrollViewDelegate {
     }
     
     // =========================================================
+    // DOCTOR CARD  ⬅️ BARU
+    // =========================================================
+    
+    private func setupDoctorCard() {
+        
+        doctorCard.translatesAutoresizingMaskIntoConstraints = false
+        doctorCard.backgroundColor = .white
+        doctorCard.layer.cornerRadius = 16
+        doctorCard.layer.shadowColor = UIColor.black.cgColor
+        doctorCard.layer.shadowOpacity = 0.08
+        doctorCard.layer.shadowRadius = 6
+        doctorCard.layer.shadowOffset = CGSize(width: 0, height: 3)
+        
+        contentView.addSubview(doctorCard)
+        
+        NSLayoutConstraint.activate([
+            doctorCard.topAnchor.constraint(equalTo: gridContainer.bottomAnchor, constant: 16),
+            doctorCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            doctorCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            doctorCard.heightAnchor.constraint(equalToConstant: 72)
+        ])
+        
+        // ── Left icon circle ──
+        let iconCircle = UIView()
+        iconCircle.translatesAutoresizingMaskIntoConstraints = false
+        iconCircle.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.12)
+        iconCircle.layer.cornerRadius = 22
+        
+        let personIcon = UIImageView()
+        personIcon.translatesAutoresizingMaskIntoConstraints = false
+        personIcon.image = UIImage(systemName: "person.fill")
+        personIcon.tintColor = .systemBlue
+        personIcon.contentMode = .scaleAspectFit
+        
+        iconCircle.addSubview(personIcon)
+        doctorCard.addSubview(iconCircle)
+        
+        NSLayoutConstraint.activate([
+            iconCircle.leadingAnchor.constraint(equalTo: doctorCard.leadingAnchor, constant: 16),
+            iconCircle.centerYAnchor.constraint(equalTo: doctorCard.centerYAnchor),
+            iconCircle.widthAnchor.constraint(equalToConstant: 44),
+            iconCircle.heightAnchor.constraint(equalToConstant: 44),
+            
+            personIcon.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
+            personIcon.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
+            personIcon.widthAnchor.constraint(equalToConstant: 22),
+            personIcon.heightAnchor.constraint(equalToConstant: 22)
+        ])
+        
+        // ── Text stack ──
+        let textStack = UIStackView()
+        textStack.axis = .vertical
+        textStack.spacing = 3
+        textStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        let titleLbl = UILabel()
+        titleLbl.text = "Konsultasi Kesehatan"
+        titleLbl.font = UIFont.boldSystemFont(ofSize: 15)
+        titleLbl.textColor = .label
+        
+        let subtitleLbl = UILabel()
+        subtitleLbl.text = "Chat langsung dengan dokter"
+        subtitleLbl.font = UIFont.systemFont(ofSize: 13)
+        subtitleLbl.textColor = .secondaryLabel
+        
+        textStack.addArrangedSubview(titleLbl)
+        textStack.addArrangedSubview(subtitleLbl)
+        doctorCard.addSubview(textStack)
+        
+        NSLayoutConstraint.activate([
+            textStack.leadingAnchor.constraint(equalTo: iconCircle.trailingAnchor, constant: 14),
+            textStack.centerYAnchor.constraint(equalTo: doctorCard.centerYAnchor),
+            textStack.trailingAnchor.constraint(lessThanOrEqualTo: doctorCard.trailingAnchor, constant: -56)
+        ])
+        
+        // ── Right chevron/doc icon ──
+        let rightIcon = UIImageView()
+        rightIcon.translatesAutoresizingMaskIntoConstraints = false
+        rightIcon.image = UIImage(systemName: "doc.text")
+        rightIcon.tintColor = UIColor.systemGray3
+        rightIcon.contentMode = .scaleAspectFit
+        
+        doctorCard.addSubview(rightIcon)
+        
+        NSLayoutConstraint.activate([
+            rightIcon.trailingAnchor.constraint(equalTo: doctorCard.trailingAnchor, constant: -16),
+            rightIcon.centerYAnchor.constraint(equalTo: doctorCard.centerYAnchor),
+            rightIcon.widthAnchor.constraint(equalToConstant: 22),
+            rightIcon.heightAnchor.constraint(equalToConstant: 22)
+        ])
+        
+        // ── Tap gesture ──
+        let tap = UITapGestureRecognizer(target: self, action: #selector(onTapDokter))
+        doctorCard.addGestureRecognizer(tap)
+        doctorCard.isUserInteractionEnabled = true
+        
+        // ── Highlight effect on press ──
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(doctorCardHighlight(_:)))
+        longPress.minimumPressDuration = 0.05
+        doctorCard.addGestureRecognizer(longPress)
+        tap.require(toFail: longPress)
+    }
+    
+    @objc private func doctorCardHighlight(_ gesture: UILongPressGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            UIView.animate(withDuration: 0.1) {
+                self.doctorCard.transform = CGAffineTransform(scaleX: 0.97, y: 0.97)
+                self.doctorCard.alpha = 0.85
+            }
+        case .ended, .cancelled, .failed:
+            UIView.animate(withDuration: 0.15) {
+                self.doctorCard.transform = .identity
+                self.doctorCard.alpha = 1.0
+            }
+            openPage(DoctorListActivity())
+        default:
+            break
+        }
+    }
+    
+    // =========================================================
     // DASHBOARD (STACKVIEW VERSION - 1:1 ANDROID)
     // =========================================================
     
@@ -420,7 +543,8 @@ final class Home: Boyke, UIScrollViewDelegate {
         contentView.addSubview(dashboardCard)
         
         NSLayoutConstraint.activate([
-            dashboardCard.topAnchor.constraint(equalTo: gridContainer.bottomAnchor, constant: 16),
+            // ⬅️ DIUBAH: top sekarang mengacu ke doctorCard, bukan gridContainer
+            dashboardCard.topAnchor.constraint(equalTo: doctorCard.bottomAnchor, constant: 16),
             dashboardCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             dashboardCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             dashboardCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24)
@@ -609,23 +733,7 @@ final class Home: Boyke, UIScrollViewDelegate {
         let legend = lineChartView.legend
         legend.enabled = false
 
-//        legend.verticalAlignment = .bottom
-//        legend.horizontalAlignment = .right   // mentok kanan
-//        legend.orientation = .horizontal      // 🔥 horizontal
-
-//        legend.drawInside = false
-//        legend.wordWrapEnabled = true
-
-//        legend.form = .circle
-//        legend.formSize = 8
-
-//        legend.xEntrySpace = 6
-//        legend.yEntrySpace = 3
-
-//        legend.font = UIFont.systemFont(ofSize: 9)  // 🔥 kecilkan font
-//        legend.maxSizePercent = 1.0
-
-        lineChartView.extraBottomOffset = 12   // 🔥 margin dari chart ke legend       // 🔥 penting supaya tidak potong chart
+        lineChartView.extraBottomOffset = 12
 
         // ===== X AXIS =====
         let xAxis = lineChartView.xAxis
@@ -1091,7 +1199,6 @@ struct DashboardData {
         let tahunAktif = "\(json["tahunAktif"] ?? "")"
         let bulanAwal = "\(json["bulanAwal"] ?? "")"
 
-        // SUMMARY SUBDIT
         // SUMMARY SUBDIT
         var summary: [String: SummarySubdit] = [:]
 
