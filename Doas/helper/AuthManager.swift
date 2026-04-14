@@ -435,16 +435,55 @@ final class AuthManager {
     // TOAST
     // ======================================================
 
+//    private func showToast(_ message: String) {
+//
+//        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+//              let window = scene.windows.first,
+//              let root = window.rootViewController else {
+//            return
+//        }
+//
+//        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+//        root.present(alert, animated: true)
+//    }
+    
     private func showToast(_ message: String) {
+        DispatchQueue.main.async {
+            // Cara modern mengambil window di iOS 15+ untuk menghindari warning deprecation
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+                  var topController = window.rootViewController else {
+                return
+            }
 
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = scene.windows.first,
-              let root = window.rootViewController else {
-            return
+            // Cari ViewController paling atas (agar alert tidak tertutup modal lain)
+            while let presented = topController.presentedViewController {
+                topController = presented
+            }
+
+            // Mencegah alert muncul tumpang tindih jika sudah ada alert yang tampil
+            if topController is UIAlertController { return }
+
+            let alert = UIAlertController(title: "Informasi", message: message, preferredStyle: .alert)
+            
+            // Tambahkan tombol OK agar alert bisa di-dismiss
+            let refreshAction = UIAlertAction(title: "Refresh", style: .default) { _ in
+                if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = scene.windows.first {
+                    
+                    // Kita panggil Home() baru untuk memastikan state di-reset total
+                    window.rootViewController = Home()
+                    window.makeKeyAndVisible()
+                }
+            }
+            
+            alert.addAction(refreshAction)
+            
+            // 4. Tambahkan tombol OK/Tutup agar alert bisa di-dismiss manual
+            alert.addAction(UIAlertAction(title: "Tutup", style: .cancel, handler: nil))
+            
+            topController.present(alert, animated: true)
         }
-
-        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        root.present(alert, animated: true)
     }
     
     func goToMainActivity() {

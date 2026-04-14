@@ -4,8 +4,9 @@ import DGCharts
 import Network
 
 final class Home: Boyke, UIScrollViewDelegate {
-    private let monitor = NWPathMonitor()
-    private let monitorQueue = DispatchQueue(label: "InternetMonitor")
+//    private var monitor2: NWPathMonitor? // Ubah jadi opsional agar bisa dibuat ulang
+//    private let monitorQueue2 = DispatchQueue(label: "InternetMonitor")
+    private var lastStatus: NWPath.Status = .requiresConnection
     // MARK: - Scroll Structure
     let lineChartView = LineChartView()
     let scrollView = UIScrollView()
@@ -94,7 +95,7 @@ final class Home: Boyke, UIScrollViewDelegate {
         btInfo.addTarget(self, action: #selector(ontapInfo), for: .touchUpInside)
         btDoas.addTarget(self, action: #selector(ontapDoas), for: .touchUpInside)
         btLog.addTarget(self, action: #selector(ontapLog), for: .touchUpInside)
-        self.monitorInternet()
+       // self.monitorInternetHome()
         btProfile.addTarget(self, action: #selector(bukaprofile), for: .touchUpInside)
     }
     @objc private func bukaprofile() {
@@ -660,9 +661,19 @@ final class Home: Boyke, UIScrollViewDelegate {
     // DATA
     // =========================================================
 
-    func refreshData() {
+    public func refreshData() {
         if isRequestRunning { return }
         isRequestRunning = true
+        
+        // Safety timeout (seperti di Android): reset flag setelah 15 detik jika tak ada respon
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+            if self.isRequestRunning {
+                self.isRequestRunning = false
+                self.hideLoading()
+            }
+        }
+        
+        // Pastikan fungsi dos() Anda nantinya mengeset isRequestRunning = false di onSuccess/onError
         dos()
     }
 
@@ -1007,24 +1018,38 @@ final class Home: Boyke, UIScrollViewDelegate {
             self.tvIsi.text = nextVC.item.isi.hendry_htmlToPlain()
         }
     }
-    func monitorInternet() {
 
-        monitor.pathUpdateHandler = { path in
-
-            if path.status == .satisfied {
-
-                DispatchQueue.main.async {
-
-                    self.refreshData()
-                }
-            }
-        }
-
-        monitor.start(queue: monitorQueue)
+//    func monitorInternetHome() {
+//        // Stop monitor lama jika ada
+//        monitor2?.cancel()
+//        
+//        // Buat instance baru karena NWPathMonitor tidak bisa di-restart
+//        let newMonitor = NWPathMonitor()
+//        newMonitor.pathUpdateHandler = { [weak self] path in
+//            guard let self = self else { return }
+//            
+//            // Logika: Hanya refresh jika status berubah dari OFFLINE -> ONLINE
+//            if path.status == .satisfied && self.lastStatus != .satisfied {
+//                DispatchQueue.main.async {
+//                    print("🌐 Internet Kembali: Mengambil data...")
+//                    self.refreshData()
+//                }
+//            }
+//            self.lastStatus = path.status
+//        }
+//        newMonitor.start(queue: monitorQueue2)
+//        self.monitor2 = newMonitor
+//    }
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // Jalankan monitor setiap kali halaman akan muncul
+       // monitorInternetHome()
     }
- 
-    override func viewDidDisappear(_ animated: Bool) {
-        monitor.cancel()
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // Matikan monitor saat meninggalkan halaman untuk hemat baterai
+       // monitor2?.cancel()
     }
 }
 

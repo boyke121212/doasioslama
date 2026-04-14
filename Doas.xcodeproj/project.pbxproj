@@ -100,7 +100,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
-				LastUpgradeCheck = 2620;
+				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					848BAD1D2F55A2D1001FD8B5 = {
 						CreatedOnToolsVersion = 26.2;
@@ -162,6 +162,7 @@
 				DEVELOPMENT_TEAM = X258N9GV6Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Doas/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Aplikasi membutuhkan kamera untuk mengambil foto bukti absensi";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Aplikasi membutuhkan verifikasi biometrik untuk absensi";
@@ -201,6 +202,7 @@
 				DEVELOPMENT_TEAM = X258N9GV6Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Doas/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Aplikasi membutuhkan kamera untuk mengambil foto bukti absensi";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Aplikasi membutuhkan verifikasi biometrik untuk absensi";
@@ -288,6 +290,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -345,6 +348,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};

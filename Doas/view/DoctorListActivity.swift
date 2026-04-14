@@ -41,6 +41,7 @@ class DoctorListActivity: Boyke {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        monitorInternet()
         setupNavigation()
         setupHeader()
         setupUI()
@@ -95,6 +96,7 @@ class DoctorListActivity: Boyke {
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        monitorInternet()
         fetchDoctors(showProgress: true)
     }
 
