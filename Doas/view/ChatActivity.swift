@@ -480,6 +480,73 @@ class ChatActivity: Boyke {
         }
     }
 
+    // MARK: - Image Actions
+
+    private func presentImageActions(for urlString: String) {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Buka dengan aplikasi iOS", style: .default, handler: { [weak self] _ in
+            self?.downloadImageToTempAndOpen(urlString: urlString)
+        }))
+        alert.addAction(UIAlertAction(title: "Simpan ke Galeri", style: .default, handler: { [weak self] _ in
+            self?.downloadImageAndSaveToPhotos(urlString: urlString)
+        }))
+        alert.addAction(UIAlertAction(title: "Batal", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    private func authorizedImageRequest(for url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        let token = SecurePrefs().getAccessToken() ?? ""
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.addValue(DeviceSecurityHelper.getDeviceHash(),        forHTTPHeaderField: "X-Device-Hash")
+        request.addValue(DeviceSecurityHelper.getAppSignatureHash(),  forHTTPHeaderField: "X-App-Signature")
+        request.addValue("ios",                                       forHTTPHeaderField: "Platform")
+        request.addValue("application/json",                          forHTTPHeaderField: "Accept")
+        return request
+    }
+
+    private func downloadImageToTempAndOpen(urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        let request = authorizedImageRequest(for: url)
+        showLoading()
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                self?.hideLoading()
+                if let error = error { self?.showToast("Gagal download: \(error.localizedDescription)"); return }
+                guard let data = data, let image = UIImage(data: data) else { self?.showToast("Data gambar tidak valid"); return }
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("preview_\(UUID().uuidString).jpg")
+                if let jpg = image.jpegData(compressionQuality: 1.0) {
+                    try? jpg.write(to: tempURL)
+                    self?.openFile(at: tempURL)
+                } else {
+                    self?.showToast("Gagal menyiapkan preview")
+                }
+            }
+        }.resume()
+    }
+
+    private func downloadImageAndSaveToPhotos(urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        let request = authorizedImageRequest(for: url)
+        showLoading()
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                self?.hideLoading()
+                if let error = error { self?.showToast("Gagal download: \(error.localizedDescription)"); return }
+                guard let data = data, let image = UIImage(data: data) else { self?.showToast("Data gambar tidak valid"); return }
+                UIImageWriteToSavedPhotosAlbum(image, self, #selector(ChatActivity.image(_:didFinishSavingWithError:contextInfo:)), nil)
+            }
+        }.resume()
+    }
+
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        if let error = error {
+            showToast("Gagal menyimpan: \(error.localizedDescription)")
+        } else {
+            showToast("Tersimpan ke Galeri")
+        }
+    }
+
     // MARK: - Helpers
 
     private func scrollToBottom(animated: Bool) {
@@ -520,12 +587,16 @@ extension ChatActivity: UITableViewDataSource, UITableViewDelegate {
             let cell = tableView.dequeueReusableCell(withIdentifier: OutgoingCell.reuseId, for: indexPath) as! OutgoingCell
             cell.configure(with: msg, onPdfTap: { [weak self] url, name in
                 self?.downloadAndOpenPdf(urlString: url, fileName: name)
+            }, onImageTap: { [weak self] url in
+                self?.presentImageActions(for: url)
             })
             return cell
         } else {
             let cell = tableView.dequeueReusableCell(withIdentifier: IncomingCell.reuseId, for: indexPath) as! IncomingCell
             cell.configure(with: msg, onPdfTap: { [weak self] url, name in
                 self?.downloadAndOpenPdf(urlString: url, fileName: name)
+            }, onImageTap: { [weak self] url in
+                self?.presentImageActions(for: url)
             })
             return cell
         }
@@ -587,6 +658,9 @@ class OutgoingCell: UITableViewCell {
     private var pdfTapHandler: ((String, String) -> Void)?
     private var pdfUrl: String?
     private var pdfName: String?
+
+    private var imageTapHandler: ((String) -> Void)?
+    private var imageUrl: String?
 
     // Bubble card (brand_primary background)
     private let card: UIView = {
@@ -707,19 +781,24 @@ class OutgoingCell: UITableViewCell {
             card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
             card.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 60),
         ])
+
+        photoView.isUserInteractionEnabled = true
+        photoView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapImage)))
     }
 
     // MARK: Configure
-    func configure(with msg: ChatActivity.Message, onPdfTap: @escaping (String, String) -> Void) {
+    func configure(with msg: ChatActivity.Message, onPdfTap: @escaping (String, String) -> Void, onImageTap: @escaping (String) -> Void) {
         messageLabel.text = msg.content.isEmpty ? nil : msg.content
         messageLabel.isHidden = msg.content.isEmpty
         timeLabel.text = msg.timestamp
         pdfTapHandler = onPdfTap
+        imageTapHandler = onImageTap
 
         if let fileName = msg.fileUrl, !fileName.isEmpty {
-            let baseUrl  = Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String ?? ""
+            let baseUrl  = AppConfig.BASE_URL
             let cleanBase = baseUrl.hasSuffix("/") ? String(baseUrl.dropLast()) : baseUrl
-            let fullUrl  = "\(cleanBase)/api/chats/file?path=\(fileName)"
+            let encodedPath = fileName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fileName
+            let fullUrl  = "\(cleanBase)/api/chats/file?path=\(encodedPath)"
 
             if fileName.lowercased().hasSuffix(".pdf") {
                 photoView.isHidden    = true
@@ -730,17 +809,23 @@ class OutgoingCell: UITableViewCell {
             } else {
                 pdfContainer.isHidden = true
                 photoView.isHidden    = false
+                imageUrl = fullUrl
                 loadImage(url: fullUrl, into: photoView)
             }
         } else {
             photoView.isHidden    = true
             pdfContainer.isHidden = true
+            imageUrl = nil
         }
     }
 
     @objc private func didTapPdf() {
         guard let url = pdfUrl, let name = pdfName else { return }
         pdfTapHandler?(url, name)
+    }
+    @objc private func didTapImage() {
+        guard let url = imageUrl else { return }
+        imageTapHandler?(url)
     }
 }
 
@@ -755,6 +840,9 @@ class IncomingCell: UITableViewCell {
     private var pdfTapHandler: ((String, String) -> Void)?
     private var pdfUrl:  String?
     private var pdfName: String?
+
+    private var imageTapHandler: ((String) -> Void)?
+    private var imageUrl: String?
 
     private let card: UIView = {
         let v = UIView()
@@ -871,18 +959,22 @@ class IncomingCell: UITableViewCell {
             card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
             card.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -60),
         ])
+        photoView.isUserInteractionEnabled = true
+        photoView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapImage)))
     }
 
-    func configure(with msg: ChatActivity.Message, onPdfTap: @escaping (String, String) -> Void) {
+    func configure(with msg: ChatActivity.Message, onPdfTap: @escaping (String, String) -> Void, onImageTap: @escaping (String) -> Void) {
         messageLabel.text    = msg.content.isEmpty ? nil : msg.content
         messageLabel.isHidden = msg.content.isEmpty
         timeLabel.text = msg.timestamp
         pdfTapHandler  = onPdfTap
+        imageTapHandler = onImageTap
 
         if let fileName = msg.fileUrl, !fileName.isEmpty {
-            let baseUrl   = Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String ?? ""
+            let baseUrl   = AppConfig.BASE_URL
             let cleanBase = baseUrl.hasSuffix("/") ? String(baseUrl.dropLast()) : baseUrl
-            let fullUrl   = "\(cleanBase)/api/chats/file?path=\(fileName)"
+            let encodedPath = fileName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fileName
+            let fullUrl   = "\(cleanBase)/api/chats/file?path=\(encodedPath)"
 
             if fileName.lowercased().hasSuffix(".pdf") {
                 photoView.isHidden    = true
@@ -893,17 +985,23 @@ class IncomingCell: UITableViewCell {
             } else {
                 pdfContainer.isHidden = true
                 photoView.isHidden    = false
+                imageUrl = fullUrl
                 loadImage(url: fullUrl, into: photoView)
             }
         } else {
             photoView.isHidden    = true
             pdfContainer.isHidden = true
+            imageUrl = nil
         }
     }
 
     @objc private func didTapPdf() {
         guard let url = pdfUrl, let name = pdfName else { return }
         pdfTapHandler?(url, name)
+    }
+    @objc private func didTapImage() {
+        guard let url = imageUrl else { return }
+        imageTapHandler?(url)
     }
 }
 
@@ -914,7 +1012,7 @@ class IncomingCell: UITableViewCell {
 /// Loads a chat image that requires Authorization + security headers.
 private func loadImage(url urlString: String, into imageView: UIImageView) {
     guard let url = URL(string: urlString) else { return }
-
+    print("url adalah",urlString)
     let token = SecurePrefs().getAccessToken() ?? ""
     var request = URLRequest(url: url)
     request.addValue("Bearer \(token)",                           forHTTPHeaderField: "Authorization")
@@ -951,3 +1049,4 @@ extension UIColor {
         )
     }
 }
+
