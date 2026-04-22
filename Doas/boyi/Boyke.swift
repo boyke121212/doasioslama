@@ -3,6 +3,7 @@ import Network
 import UserNotifications
 
 class Boyke: UIViewController {
+    //sudah masuk repo doasioslama belum
     private let monitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "InternetMonitorboy")
     private var isConnected: Bool = false
